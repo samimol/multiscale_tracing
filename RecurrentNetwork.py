@@ -33,12 +33,11 @@ class RecurrentNetwork():
 
         self.input_layer = InputLayer(self.n_input_features, self.n_hidden_features,self.big_pixels_size)
         self.low_scale_layer = HiddenLayer(self.n_input_features, self.n_hidden_features, 6,self.big_pixels_size,grid_size,change_scale_u=True)
-
         self.middle_scale_layer = HiddenLayer(self.n_hidden_features, 6,self.high_feature,self.big_pixels_size,grid_size,change_scale_v=True,higher_scale=True,change_scale_u=True,upper_ymod=True)
-
         self.high_scale_layer = HiddenLayer(self.high_feature,6,self.high_feature,self.bigger_pixels_size//self.big_pixels_size,grid_size,upper_ymod = False,change_scale_v=True)
 
         self.output_layer = OutputLayer(self.n_hidden_features, self.n_input_features, 1,self.grid_size,self.big_pixels_size,self.bigger_pixels_size)
+        
         self.feedforward_network_curve = FFLayer(feedforward_curve.low_scale_feedforward,feedforward_curve.middle_scale_feedforward_interm,feedforward_curve.middle_scale_feedforward,feedforward_curve.high_scale_feedforward_interm,feedforward_curve.high_scale_feedforward)
         self.feedforward_network_object = FFLayer(feedforward_object.low_scale_feedforward,feedforward_object.middle_scale_feedforward_interm,feedforward_object.middle_scale_feedforward,feedforward_object.high_scale_feedforward_interm,feedforward_object.high_scale_feedforward)
 
@@ -136,7 +135,7 @@ class RecurrentNetwork():
         ([self.Y6mod2d,self.VIP62d,self.SOM62d,
           self.Y3mod2d,self.VIP32d,self.SOM32d,
           self.Y2mod2d,self.VIP22d,self.SOM22d,
-          self.Xmod2d,self.VIP02d,self.SOM02d]) = self.detachAndreattach([self.Y6mod2,self.VIP62,self.SOM62,
+          self.Xmod2d,self.VIP02d,self.SOM02d]) = self.detach_and_reattach([self.Y6mod2,self.VIP62,self.SOM62,
                                                                           self.Y3mod2,self.VIP32,self.SOM32,
                                                                     self.Y2mod2,self.VIP22,self.SOM22,
                                                                     self.Xmod2,self.VIP02,self.SOM02])
@@ -148,7 +147,7 @@ class RecurrentNetwork():
         (self.Y6mod,self.VIP6,self.SOM6) = self.high_scale_layer.forward(self.high_scale, lower_ymod=self.Y3mod, upper_ymod=None,horiz = self.Y6mod2d)
 
         
-        self.Z = self.calc_Output(device)
+        self.Z = self.calc_output(device)
 
         if self.save_activities:
             self.saveQ[len(self.saveQ) - 1].append(self.Z.detach())
@@ -159,7 +158,7 @@ class RecurrentNetwork():
 
         return (action_chosen)
 
-    def calc_Output(self, device):
+    def calc_output(self, device):
         Z = self.output_layer.forward(self.Xmod,self.Y2mod,self.Y3mod,self.Y6mod)
         with torch.no_grad():
             ZZ =torch.flatten(Z.permute(0,1,3,2), start_dim=2) #Flatten in F order beause everything is in F order
@@ -194,7 +193,7 @@ class RecurrentNetwork():
             if rnd <= prob:
                 return i
 
-    def Accessory(self):
+    def accessory(self):
 
         init = torch.autograd.grad(self.Z[self.action], [self.Y3mod,self.VIP3,self.SOM3,
                                                          self.Y2mod,self.VIP2,self.SOM2,
@@ -277,7 +276,7 @@ class RecurrentNetwork():
         (Zy6mod,Zvip6,Zsom6,
             Zy3mod,Zvip3,Zsom3,
                 Zy2mod,Zvip2,Zsom2,
-                Zxmod,Zvip0,Zsom0) = self.Accessory()
+                Zxmod,Zvip0,Zsom0) = self.accessory()
 
         self.input_layer.update_layer([self.Xmod,self.SOM0,self.VIP0], [Zxmod,Zsom0,Zvip0], self.beta, self.delta)
         self.low_scale_layer.update_layer([self.Y2,self.Y2mod,self.SOM2,self.VIP2], [None,Zy2mod,Zsom2,Zvip2], self.beta, self.delta,train_v=False)
@@ -285,7 +284,7 @@ class RecurrentNetwork():
         self.high_scale_layer.update_layer([self.Y6,self.Y6mod,self.SOM6,self.VIP6], [None,Zy6mod,Zsom6,Zvip6], self.beta, self.delta)
         self.output_layer.update_layer(self.Z[self.action], self.beta, self.delta)
 
-    def detachAndreattach(self, x):
+    def detach_and_reattach(self, x):
         detached = [xx.detach() for xx in x]
         for i, xx in enumerate(detached):
             xx.requires_grad = True

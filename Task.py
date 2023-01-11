@@ -49,7 +49,7 @@ class Task():
         if self.task_type != 'searchtrace' and self.task_type != 'trace' and self.task_type != 'tracesearch':
             raise Exception('Task type must be either searchtrace or trace or tracesearch')
 
-    def stateReset(self):
+    def state_reset(self):
         self.trial_ended = True
         self.state = 'intertrial'
         self.input = [self.display, self.display_disk]
@@ -64,7 +64,7 @@ class Task():
         return(input, reward, trial_ended)
 
     def do_intertrial(self, action):
-            self.pickTrialType()
+            self.pick_trial_type()
             self.input = [self.display, self.display_disk]
             self.state = 'go'
 
@@ -73,17 +73,17 @@ class Task():
         pixel_chosen = torch.where(action == 1)[-1]
         if pixel_chosen == self.target_curve[-1]:
             self.current_reward = self.current_reward + self.final_reward * 0.8
-            self.stateReset()
+            self.state_reset()
         else:
-            self.stateReset()
+            self.state_reset()
 
-    def pickTrialType(self):
+    def pick_trial_type(self):
         position_red_marker = np.random.randint(2)
         position_yellow_marker = 1 if position_red_marker == 0 else 0
         self.position_markers = [position_red_marker, position_yellow_marker]
         self.feature_target = np.random.randint(2) 
-        object_1,object_2 = self.PickCurve()
-        self.DrawStimulus(object_1,object_2)
+        object_1,object_2 = self.pick_object()
+        self.draw_stimulus(object_1,object_2)
 
         
 class TraceCurves(Task):
@@ -112,7 +112,7 @@ class TraceCurves(Task):
                         next_to_each_other = True
         return(next_to_each_other)
     
-    def PickCurve(self):
+    def pick_object(self):
         if self.no_curves:
             red_yellow_position = np.random.randint(self.grid_size**2)
             blue_position = np.random.randint(self.grid_size**2)
@@ -160,7 +160,7 @@ class TraceCurves(Task):
                 object_2 = self.object_2
         return (object_1, object_2)
         
-    def DrawStimulus(self,object_1, object_2):
+    def draw_stimulus(self,object_1, object_2):
         display = torch.zeros((1, self.n_hidden_features, self.grid_size, self.grid_size),device=self.device)
         display_disk = torch.zeros((1, self.n_hidden_features, 2))
         if self.no_curves:
@@ -195,7 +195,7 @@ class TraceObjects(Task):
         self.task_type = 'trace'
         super().__init__(n_hidden_features,device,object_1,object_2)
 
-    def PickCurve(self):
+    def pick_object(self):
         if len(self.object_1) == 0:
             rad = 0.9999
             edgy = 0.9999
@@ -224,7 +224,7 @@ class TraceObjects(Task):
             object_2 = self.object_2           
         return (object_1, object_2)
         
-    def DrawStimulus(self,object_1, object_2):
+    def draw_stimulus(self,object_1, object_2):
         display = torch.zeros((1, self.n_hidden_features, self.grid_size, self.grid_size),device=self.device)
         display_disk = torch.zeros((1, self.n_hidden_features, 2))
 
