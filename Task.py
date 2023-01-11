@@ -242,6 +242,7 @@ class TraceObjects(Task):
         display[:, 0, object_1[0] % self.grid_size, object_1[0]//self.grid_size] = 1
           
         self.target_curve = object_1
+        self.distractor_curve = object_2
         self.display = display
         self.display_disk = display_disk     
         

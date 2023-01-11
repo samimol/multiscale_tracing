@@ -161,6 +161,47 @@ def make_blob(grid_size):
     return x_blob,y_blob
 
 
+def run_trials(t,CurveLength,TrialNumber,n,device,verbose=True):
+  n.exploitation_probability = 1
+  n.save_activities = True
+  corrects = []
+  target_history = []
+  distr_history = []
+  display = []
+  t.curve_length = CurveLength
+  action = 0
+  n.saveXmod = [[]]
+  n.saveY2mod = [[]]
+  n.saveY3mod = [[]]
+  n.saveY6mod = [[]]
+  n.saveQ = [[]]
+
+
+  for p in range(TrialNumber):
+    trial_running = True
+    display.append([])
+    i=0
+    new_input, reward, trialEnd= t.do_step(action)
+    while trial_running:
+      action = n.do_step(new_input,reward,trialEnd,device)
+      new_input, reward, trialEnd = t.do_step(action)
+      display[p].append(new_input[0])
+      if trialEnd:
+        trial_running = False
+        if reward == 0:
+          corrects.append(0)
+        else:
+          corrects.append(1)
+      i = i + 1
+    target_history.append(t.target_curve)
+    distr_history.append(t.distractor_curve) 
+  if verbose:
+      print(np.mean(corrects))
+  return(n,corrects,target_history,distr_history,display)  
+
+
+
+
 def get_coordinates(data,x_init,y_init,coordinates,grid_size):
     # Get the coordinates of a curve already drwan starting from (x_init,y_init)
     if len(coordinates) == 0:
