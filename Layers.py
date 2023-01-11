@@ -13,8 +13,6 @@ class CustomLayer(nn.Module):
 
     def __init__(self):
         self.initialisation_range = 0.1
-        self.contrib_list = []
-        self.contrib = False
         super().__init__()
 
     def activation_function(self, x):
@@ -40,7 +38,7 @@ class CustomLayer(nn.Module):
         if change_scale:
           for f in range(K.shape[0]):
             for f2 in range(K.shape[1]):
-              K[f, f2, :, :] = 0.1 * np.random.rand() + 1
+              K[f, f2, :, :] = self.initialisation_range * np.random.rand() + 1
         else:
           for f in range(K.shape[0]):
               for f2 in range(K.shape[1]):
@@ -68,12 +66,12 @@ class CustomLayer(nn.Module):
               for f2 in range(K.shape[1]):
                 if self.layer_type != "output":
                   if change_scale:
-                    K[f, f2, :, :] = 0.1 * np.random.rand() + 0.5
+                    K[f, f2, :, :] = self.initialisation_range * np.random.rand() + 0.5
                   else:
-                      K[f, f2, 0,1] = 0.1 * np.random.rand() + 0.1
-                      K[f, f2, 1,0] = 0.1 * np.random.rand() + 0.1
-                      K[f, f2, 1,2] = 0.1 * np.random.rand() + 0.1
-                      K[f, f2, 2,1] = 0.1 * np.random.rand() + 0.1               
+                      K[f, f2, 0,1] = self.initialisation_range * np.random.rand() + 0.1
+                      K[f, f2, 1,0] = self.initialisation_range * np.random.rand() + 0.1
+                      K[f, f2, 1,2] = self.initialisation_range * np.random.rand() + 0.1
+                      K[f, f2, 2,1] = self.initialisation_range * np.random.rand() + 0.1               
         layer.weight = torch.nn.Parameter(K)
         if layer.bias is not None:
             layer.bias = torch.nn.Parameter(bias)
@@ -86,10 +84,10 @@ class CustomLayer(nn.Module):
         for f in range(K.shape[0]):
               for f2 in range(K.shape[1]):
                 if f == f2 :
-                    K[f, f2, 1, 1] = 1#add+0.1 * np.random.rand()
+                    K[f, f2, 1, 1] = 1
         if layer.bias is not None:
           for f in range(bias.shape[0]):  
-              bias[f] =  -1 - 0.1 * np.random.rand()
+              bias[f] =  -1 - self.initialisation_range * np.random.rand()
         layer.weight = torch.nn.Parameter(K)
         if layer.bias is not None:
             layer.bias = torch.nn.Parameter(bias)
@@ -110,13 +108,11 @@ class CustomLayer(nn.Module):
             intermmask[lower_bound:upper_bound,lower_bound:upper_bound] = 1
             m = torch.mean(traces[:, :, intermmask == 1], axis=2)
             traces[:, :, intermmask == 1] =  m[:,None]    
-      
         return(traces)
 
 
     def update_weight(self, layer, upper, beta, delta, mask=None, z=None, average=True,receptive_field_size=1,inhib=False,change_scale=False):
         with torch.no_grad():
-            
             # Getting the derivative of the output unit with respect to the 
             # weight and bias
             if layer.bias is not None:
@@ -131,7 +127,7 @@ class CustomLayer(nn.Module):
             
             if inhib == False:
                 # Averaging the weight and bias and updating the weights with RPE
-                if (self.layer_type == 'output' and average) or change_scale:# or self.change_scale_u:# or self.higher_scale:
+                if (self.layer_type == 'output' and average) or change_scale:# or self.change_scale_fb:# or self.higher_scale:
                     delta_weight = self.average_traces(delta_weight, mask,receptive_field_size=receptive_field_size)
                 elif mask is not None:
                     delta_weight = delta_weight*mask
@@ -163,7 +159,7 @@ class CustomLayer(nn.Module):
               self.feedback_mask = self.feedback_mask.to(device)
       elif self.layer_type == 'output':
           self.high_to_output.to(device)
-          self.skip.to(device)
+          self.input_to_output.to(device)
           self.low_to_output.to(device)
           self.middle_to_output.to(device)
           self.high_to_output_mask = self.high_to_output_mask.to(device)
@@ -177,15 +173,14 @@ class InputLayer(CustomLayer):
         super().__init__()
         self.layer_type = 'input'
         K_size = 3
-        self.change_scale_v = False
-        self.change_scale_u = False
+        self.change_scale_ff = False
+        self.change_scale_fb = False
         self.higher_scale = False
         self.big_pixels_size = big_pixels_size
         self.upper_ymod = True
 
         self.t = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same')
         self.umod = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same',bias=False)
-
         self.wie = nn.Conv2d(feature_in, feature_in, K_size, stride=1, padding='same',bias=True)
 
         # Initializing weights
@@ -194,9 +189,9 @@ class InputLayer(CustomLayer):
         self.init_weights_inhib(self.wie)
 
         # Setting the mask to have connections only between neighboours
+        self.feedforward_mask = self.make_mask(self.t.weight)
         self.feedback_mask = self.make_mask(self.umod.weight)
         self.inhib_mask = self.make_mask(self.wie.weight)
-        self.feedforward_mask = self.make_mask(self.t.weight)
 
     def forward(self, upper_y, upper_ymod, input_stimulus):
         Y = input_stimulus
@@ -212,29 +207,30 @@ class InputLayer(CustomLayer):
 
 class HiddenLayer(CustomLayer):
 
-    def __init__(self, feature_in_lower, feature_out,feature_in_higher,big_pixels_size,grid_size, upper_ymod=True,change_scale_u=False,change_scale_v=False,higher_scale=False):
+    def __init__(self, feature_in_lower, feature_out,feature_in_higher,big_pixels_size,grid_size, upper_ymod=True,change_scale_fb=False,change_scale_ff=False,higher_scale=False):
         super().__init__()
         self.layer_type = 'hidden'
         self.upper_ymod = upper_ymod # If the higher layer has a modulated group
-        self.change_scale_u = change_scale_u
-        self.change_scale_v = change_scale_v
+        self.change_scale_fb = change_scale_fb
+        self.change_scale_ff = change_scale_ff
         self.higher_scale = higher_scale
         self.big_pixels_size = big_pixels_size
         self.grid_size = grid_size
         
         # Making the weights
-        if self.change_scale_v:
+        if self.change_scale_ff:
           self.t = nn.Conv2d(feature_in_lower, feature_out, self.big_pixels_size, stride=self.big_pixels_size, bias=True)
         else:
             self.t = nn.Conv2d(feature_in_lower, feature_out, 1, stride=1, padding='same', bias=True)     
+        
         if upper_ymod:
             self.umod = nn.ConvTranspose2d(feature_in_higher, feature_out, self.big_pixels_size, stride=self.big_pixels_size, padding=0,bias=False)
         self.horiz = nn.Conv2d(feature_out,feature_out,3,stride = 1,padding='same',bias=False)
         
         # Initializing the weights
-        self.init_weights_FF(self.t,change_scale = change_scale_v,one_to_one=True)
+        self.init_weights_FF(self.t,change_scale = change_scale_ff,one_to_one=True)
         if upper_ymod:
-            self.init_weights_FB(self.umod,change_scale = change_scale_u)
+            self.init_weights_FB(self.umod,change_scale = change_scale_fb)
         self.init_weights_FB(self.horiz,change_scale=False)
 
         # Making the masks        
@@ -255,9 +251,9 @@ class HiddenLayer(CustomLayer):
         return(current_ymod,VIP,SOM)
         
     def update_layer(self, upper, z, beta, delta,train_v=True):
-        self.t = self.update_weight(self.t, upper[1], beta, delta, self.feedforward_mask, z[1],change_scale=self.change_scale_v)
+        self.t = self.update_weight(self.t, upper[1], beta, delta, self.feedforward_mask, z[1],change_scale=self.change_scale_ff)
         if self.upper_ymod:
-            self.umod = self.update_weight(self.umod, upper[3], beta, delta, self.feedback_mask, z[3],change_scale = self.change_scale_u)
+            self.umod = self.update_weight(self.umod, upper[3], beta, delta, self.feedback_mask, z[3],change_scale = self.change_scale_fb)
         self.horiz = self.update_weight(self.horiz, upper[3], beta, delta, self.horizontal_mask, z[3],change_scale = False)
 
 class OutputLayer(CustomLayer):
@@ -266,7 +262,7 @@ class OutputLayer(CustomLayer):
         super().__init__()
         self.grid_size = grid_size
         K_size = 2 * self.grid_size - 1
-        self.change_scale_v = False
+        self.change_scale_ff = False
         self.layer_type = 'output'
         self.higher_scale = False
         self.grid_size = grid_size
@@ -278,10 +274,9 @@ class OutputLayer(CustomLayer):
         self.high_to_output = nn.ConvTranspose2d(6, 1,2 * self.grid_size - 1, stride=self.bigger_pixels_size, padding=int(0.5*(2 * self.grid_size - 1 - self.bigger_pixels_size)),bias=False)#nn.ConvTranspose2d(6, feature_out, 3, stride=3, padding=0,bias=False)
         self.low_to_output = nn.Conv2d(hidden_features, feature_out, K_size, stride=1, padding='same',bias=False)
         self.middle_to_output = nn.ConvTranspose2d(6, 1,2 * self.grid_size - 1, stride=self.big_pixels_size, padding=int(0.5*(2 * self.grid_size - 1 - self.big_pixels_size)),bias=False)
-        self.skip = nn.Conv2d(input_features, feature_out, 1, stride=1, padding='same', bias=False)
+        self.input_to_output = nn.Conv2d(input_features, feature_out, 1, stride=1, padding='same', bias=False)
 
         self.low_to_output_mask = torch.zeros_like(self.low_to_output.weight)  # In numpy we do the average over 49*49-49 = 2352 whereas here over 13*13 -1 = 168 so we have to divide by 14 (number of strides)
-        #self.wmask = torch.ones_like(self.w[0].weight,requires_grad = False)
         self.low_to_output_mask[:, :, self.grid_size - 1, self.grid_size - 1] = 1/50
 
         self.middle_to_output_mask = torch.zeros_like(self.middle_to_output.weight)
@@ -292,13 +287,13 @@ class OutputLayer(CustomLayer):
 
         # Initializing weights
         self.init_weights_FF(self.high_to_output,receptive_field_size=9)
-        self.init_weights_FF(self.skip, one_to_one=True) 
+        self.init_weights_FF(self.input_to_output, one_to_one=True) 
         self.init_weights_FF(self.low_to_output,receptive_field_size=1)
         self.init_weights_FF(self.middle_to_output,receptive_field_size=3)
 
 
     def forward(self, inputmod,low_scale,middle_scale,high_scale):
-        Y =  self.skip(inputmod) + self.low_to_output(low_scale) + self.middle_to_output(middle_scale) + self.high_to_output(high_scale)
+        Y =  self.input_to_output(inputmod) + self.low_to_output(low_scale) + self.middle_to_output(middle_scale) + self.high_to_output(high_scale)
         return(Y)
 
     def rescale(self,new_grid_size):
@@ -335,7 +330,7 @@ class OutputLayer(CustomLayer):
                               
         
     def update_layer(self, upper, beta, delta):
-            self.skip = self.update_weight(self.skip, upper, beta, delta, average=False)
+            self.input_to_output = self.update_weight(self.input_to_output, upper, beta, delta, average=False)
             self.low_to_output = self.update_weight(self.low_to_output, upper, beta, delta,self.low_to_output_mask, receptive_field_size = 1)
             self.middle_to_output = self.update_weight(self.middle_to_output, upper, beta, delta,self.middle_to_output_mask, receptive_field_size=self.big_pixels_size)
             self.high_to_output = self.update_weight(self.high_to_output, upper, beta, delta, self.high_to_output_mask,receptive_field_size = self.bigger_pixels_size)
@@ -354,17 +349,17 @@ class FFLayer(CustomLayer):
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
-
         low_scale = F.relu(self.low_scale_feedforward(x))
         
         # Middle scale
         middle_scale_interm = F.relu(self.middle_scale_feedforward_interm(low_scale))
         middle_scale = self.sig(self.middle_scale_feedforward(middle_scale_interm))
                 
-        #High scale
+        # High scale
         high_scale_interm = F.relu(self.high_scale_feedforward_interm(low_scale))
         high_scale = self.sig(self.high_scale_feedforward(high_scale_interm))
         
+        # Keeping only the neurons with high probability of activation
         middle_scale = torch.relu(middle_scale - 0.6)
         high_scale = torch.relu(high_scale - 0.6)
 

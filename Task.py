@@ -29,9 +29,7 @@ class Task():
 
 
         self.state = 'intertrial'
-
-        self.no_curves = False # First part of the curicculum is no curve, only the fixation point and a blue pixel
-
+        
         self.current_reward = 0
         self.final_reward = 1.50
         
@@ -49,7 +47,7 @@ class Task():
     def state_reset(self):
         self.trial_ended = True
         self.state = 'intertrial'
-        self.input = [self.display, self.display_disk]
+        self.input = self.display
 
     def do_step(self, action):
         self.trial_ended = False
@@ -101,79 +99,65 @@ class TraceCurves(Task):
         return(next_to_each_other)
     
     def pick_object(self):
-        if self.no_curves:
-            red_yellow_position = np.random.randint(self.grid_size**2)
-            blue_position = np.random.randint(self.grid_size**2)
-            while blue_position == red_yellow_position:  ########CHANGE THAT
-                blue_position = np.random.randint(self.grid_size**2)
-            object_1 = [red_yellow_position, blue_position]
-            object_2 = []
+        if len(self.object_1) == 0:
+          proba = np.random.rand()
+          while True:
+              try:
+                next_to_each_other = True
+                while next_to_each_other:
+                  if proba < 0.5:
+                    mask = np.zeros((self.grid_size, self.grid_size))
+                    object_1, mask1 = make_curves([], mask,self.curve_length,grid_size=self.grid_size)
+                    object_2, mask2 = make_curves([], mask1,self.curve_length,grid_size=self.grid_size)
+  
+                  else:
+                    direction = np.random.choice([0,1]) #{up,down},{left,right}    
+                    mask = np.zeros((self.grid_size, self.grid_size))
+                    object_1, mask1 = make_curves([], mask,self.curve_length,grid_size=self.grid_size,direction=direction)
+                    object_2, mask2 = make_curves([], mask1,self.curve_length,grid_size=self.grid_size,direction=direction)
+                  
+                  next_to_each_other = False
+  
+                  curve1_middle = np.unique([((object_1[i] // self.grid_size) // self.middle_pixel_size)*self.middle_grid_size + (object_1[i] % self.grid_size) // self.middle_pixel_size for i in range(len(object_1))])
+                  curve2_middle = np.unique([((object_2[i] // self.grid_size) // self.middle_pixel_size)*self.middle_grid_size + (object_2[i] % self.grid_size) // self.middle_pixel_size for i in range(len(object_2))])
+                  next_to_each_other_1 = self.check_not_adjacent(curve1_middle,curve1_middle,self.middle_grid_size)
+                  next_to_each_other_2 = self.check_not_adjacent(curve1_middle,curve2_middle,self.middle_grid_size)
+                  
+                  curve1_big = np.unique([((object_1[i] // self.grid_size) // self.big_pixel_size)*self.big_grid_size + (object_1[i] % self.grid_size) // self.big_pixel_size for i in range(len(object_1))])
+                  curve2_big = np.unique([((object_2[i] // self.grid_size) // self.big_pixel_size)*self.big_grid_size + (object_2[i] % self.grid_size) // self.big_pixel_size for i in range(len(object_2))])
+                  next_to_each_other_3 = self.check_not_adjacent(curve1_big,curve1_big,self.big_grid_size)
+                  next_to_each_other_4 = self.check_not_adjacent(curve1_big,curve2_big,self.big_grid_size)
+                  
+                  next_to_each_other = next_to_each_other_1 or next_to_each_other_2 or next_to_each_other_3 or next_to_each_other_4
+                  
+                break
+              except IndexError:
+                  pass
         else:
-          if len(self.object_1) == 0:
-            proba = np.random.rand()
-            while True:
-                try:
-                  next_to_each_other = True
-                  while next_to_each_other:
-                    if proba < 0.5:
-                      mask = np.zeros((self.grid_size, self.grid_size))
-                      object_1, mask1 = make_curves([], mask,self.curve_length,grid_size=self.grid_size)
-                      object_2, mask2 = make_curves([], mask1,self.curve_length,grid_size=self.grid_size)
-    
-                    else:
-                      direction = np.random.choice([0,1]) #{up,down},{left,right}    
-                      mask = np.zeros((self.grid_size, self.grid_size))
-                      object_1, mask1 = make_curves([], mask,self.curve_length,grid_size=self.grid_size,direction=direction)
-                      object_2, mask2 = make_curves([], mask1,self.curve_length,grid_size=self.grid_size,direction=direction)
-                    
-                    next_to_each_other = False
-    
-                    curve1_middle = np.unique([((object_1[i] // self.grid_size) // self.middle_pixel_size)*self.middle_grid_size + (object_1[i] % self.grid_size) // self.middle_pixel_size for i in range(len(object_1))])
-                    curve2_middle = np.unique([((object_2[i] // self.grid_size) // self.middle_pixel_size)*self.middle_grid_size + (object_2[i] % self.grid_size) // self.middle_pixel_size for i in range(len(object_2))])
-                    next_to_each_other_1 = self.check_not_adjacent(curve1_middle,curve1_middle,self.middle_grid_size)
-                    next_to_each_other_2 = self.check_not_adjacent(curve1_middle,curve2_middle,self.middle_grid_size)
-                    
-                    curve1_big = np.unique([((object_1[i] // self.grid_size) // self.big_pixel_size)*self.big_grid_size + (object_1[i] % self.grid_size) // self.big_pixel_size for i in range(len(object_1))])
-                    curve2_big = np.unique([((object_2[i] // self.grid_size) // self.big_pixel_size)*self.big_grid_size + (object_2[i] % self.grid_size) // self.big_pixel_size for i in range(len(object_2))])
-                    next_to_each_other_3 = self.check_not_adjacent(curve1_big,curve1_big,self.big_grid_size)
-                    next_to_each_other_4 = self.check_not_adjacent(curve1_big,curve2_big,self.big_grid_size)
-                    
-                    next_to_each_other = next_to_each_other_1 or next_to_each_other_2 or next_to_each_other_3 or next_to_each_other_4
-                    
-                  break
-                except IndexError:
-                    pass
-          else:
-                object_1 = self.object_1
-                object_2 = self.object_2
+              object_1 = self.object_1
+              object_2 = self.object_2
         return (object_1, object_2)
         
     def draw_stimulus(self,object_1, object_2):
         display = torch.zeros((1, self.n_hidden_features, self.grid_size, self.grid_size),device=self.device)
-        display_disk = torch.zeros((1, self.n_hidden_features, 2))
-        if self.no_curves:
-                display[:, 0, object_1[0] % self.grid_size, object_1[0]//self.grid_size] = 0
-                display[:, 3, object_1[1] % self.grid_size, object_1[1]//self.grid_size] = 1
-        else:
-                for i in range(len(object_1)):
-                    if i == 0:  # red
-                        display[:, 0, object_1[0] % self.grid_size, object_1[0]//self.grid_size] = 1
-                    elif i == len(object_1)-1:  # blue
-                        display[:, 3, object_1[i] % self.grid_size, object_1[i]//self.grid_size] = 1
-                    else:  # green
-                        display[:, 2, object_1[i] % self.grid_size, object_1[i]//self.grid_size] = 1
-                for i in range(len(object_2)):
-                    if i == 0:
-                        display[:, 2, object_2[0] % self.grid_size, object_2[0]//self.grid_size] = 1
-                    elif i == len(object_2)-1:
-                        display[:, 3, object_2[i] % self.grid_size, object_2[i]//self.grid_size] = 1
-                    else:
-                        display[:, 2, object_2[i] % self.grid_size, object_2[i]//self.grid_size] = 1
+        for i in range(len(object_1)):
+            if i == 0:  # red
+                display[:, 0, object_1[0] % self.grid_size, object_1[0]//self.grid_size] = 1
+            elif i == len(object_1)-1:  # blue
+                display[:, 3, object_1[i] % self.grid_size, object_1[i]//self.grid_size] = 1
+            else:  # green
+                display[:, 2, object_1[i] % self.grid_size, object_1[i]//self.grid_size] = 1
+        for i in range(len(object_2)):
+            if i == 0:
+                display[:, 2, object_2[0] % self.grid_size, object_2[0]//self.grid_size] = 1
+            elif i == len(object_2)-1:
+                display[:, 3, object_2[i] % self.grid_size, object_2[i]//self.grid_size] = 1
+            else:
+                display[:, 2, object_2[i] % self.grid_size, object_2[i]//self.grid_size] = 1
 
         self.target_curve = object_1
         self.distractor_curve = object_2
         self.display = display
-        self.display_disk = display_disk  
         
 
         
@@ -213,7 +197,6 @@ class TraceObjects(Task):
         
     def draw_stimulus(self,object_1, object_2):
         display = torch.zeros((1, self.n_hidden_features, self.grid_size, self.grid_size),device=self.device)
-        display_disk = torch.zeros((1, self.n_hidden_features, 2))
 
         #green  
         ind = np.unravel_index(object_1[1:-1], display[0,2,:].shape, 'F')
@@ -231,7 +214,6 @@ class TraceObjects(Task):
         self.target_curve = object_1
         self.distractor_curve = object_2
         self.display = display
-        self.display_disk = display_disk     
         
         
         

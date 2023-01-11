@@ -30,11 +30,10 @@ class RecurrentNetwork():
 
         self.device = device
 
-
         self.input_layer = InputLayer(self.n_input_features, self.n_hidden_features,self.big_pixels_size)
-        self.low_scale_layer = HiddenLayer(self.n_input_features, self.n_hidden_features, 6,self.big_pixels_size,grid_size,change_scale_u=True)
-        self.middle_scale_layer = HiddenLayer(self.n_hidden_features, 6,self.high_feature,self.big_pixels_size,grid_size,change_scale_v=True,higher_scale=True,change_scale_u=True,upper_ymod=True)
-        self.high_scale_layer = HiddenLayer(self.high_feature,6,self.high_feature,self.bigger_pixels_size//self.big_pixels_size,grid_size,upper_ymod = False,change_scale_v=True)
+        self.low_scale_layer = HiddenLayer(self.n_input_features, self.n_hidden_features, 6,self.big_pixels_size,grid_size,change_scale_fb=True)
+        self.middle_scale_layer = HiddenLayer(self.n_hidden_features, 6,self.high_feature,self.big_pixels_size,grid_size,change_scale_ff=True,higher_scale=True,change_scale_fb=True,upper_ymod=True)
+        self.high_scale_layer = HiddenLayer(self.high_feature,6,self.high_feature,self.bigger_pixels_size//self.big_pixels_size,grid_size,upper_ymod = False,change_scale_ff=True)
 
         self.output_layer = OutputLayer(self.n_hidden_features, self.n_input_features, 1,self.grid_size,self.big_pixels_size,self.bigger_pixels_size)
         
