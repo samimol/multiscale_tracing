@@ -179,8 +179,6 @@ def test_network(t,CurveLength,grid_size,TrialNumber,n,device,save_activities,ve
         n.saveY3mod = [[]]
         n.saveY6mod = [[]]
         n.saveQ = [[]]
-      
-      
     for p in range(TrialNumber):
       trial_running = True
       display.append([])
@@ -203,8 +201,6 @@ def test_network(t,CurveLength,grid_size,TrialNumber,n,device,save_activities,ve
         print(np.mean(corrects))
     n.exploitation_probability = prev_exploitation_probability
     return(n,corrects,target_history,distr_history,display)  
-
-
 
 
 def get_coordinates(data,x_init,y_init,coordinates,grid_size):

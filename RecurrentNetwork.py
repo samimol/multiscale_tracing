@@ -5,14 +5,13 @@ Created on Tue Jan  3 15:28:45 2023
 @author: Sami
 """
 
-from copy import deepcopy
-from Layers import *
+from Layers import InputLayer, HiddenLayer, OutputLayer, FFLayer
 import torch
 import numpy as np
 
 class RecurrentNetwork():
 
-    def __init__(self, n_input_features,grid_size,big_pixels_size,bigger_pixels_size,device,low_scale_feedforward,middle_scale_feedforward_interm,middle_scale_feedforward,high_scale_feedforward_interm,high_scale_feedforward):
+    def __init__(self, n_input_features,grid_size,big_pixels_size,bigger_pixels_size,device,feedforward_curve,feedforward_object):
         self.beta = 0.02
         self.n_input_features = n_input_features
         self.n_hidden_features = 1
@@ -31,11 +30,6 @@ class RecurrentNetwork():
 
         self.device = device
 
-        self.low_scale_feedforward = low_scale_feedforward
-        self.middle_scale_feedforward_interm = middle_scale_feedforward_interm
-        self.middle_scale_feedforward = middle_scale_feedforward
-        self.high_scale_feedforward_interm = high_scale_feedforward_interm
-        self.high_scale_feedforward = high_scale_feedforward
 
         self.input_layer = InputLayer(self.n_input_features, self.n_hidden_features,self.big_pixels_size)
         self.low_scale_layer = HiddenLayer(self.n_input_features, self.n_hidden_features, 6,self.big_pixels_size,grid_size,change_scale_u=True)
@@ -45,7 +39,10 @@ class RecurrentNetwork():
         self.high_scale_layer = HiddenLayer(self.high_feature,6,self.high_feature,self.bigger_pixels_size//self.big_pixels_size,grid_size,upper_ymod = False,change_scale_v=True)
 
         self.output_layer = OutputLayer(self.n_hidden_features, self.n_input_features, 1,self.grid_size,self.big_pixels_size,self.bigger_pixels_size)
-        self.feedforward_network = FFLayer(low_scale_feedforward,middle_scale_feedforward_interm,middle_scale_feedforward,high_scale_feedforward_interm,high_scale_feedforward)
+        self.feedforward_network_curve = FFLayer(feedforward_curve.low_scale_feedforward,feedforward_curve.middle_scale_feedforward_interm,feedforward_curve.middle_scale_feedforward,feedforward_curve.high_scale_feedforward_interm,feedforward_curve.high_scale_feedforward)
+        self.feedforward_network_object = FFLayer(feedforward_object.low_scale_feedforward,feedforward_object.middle_scale_feedforward_interm,feedforward_object.middle_scale_feedforward,feedforward_object.high_scale_feedforward_interm,feedforward_object.high_scale_feedforward)
+
+        self.task = 'trace_curve'
 
         self.save_activities = False
         
@@ -91,8 +88,13 @@ class RecurrentNetwork():
         norm = 10
         flag = True
 
-        self.low_scale,self.middle_scale,self.high_scale = self.feedforward_network(input_env[0])
-
+        if self.task == 'trace_curve':
+            self.low_scale,self.middle_scale,self.high_scale = self.feedforward_network_curve(input_env[0])
+        elif self.task == 'trace_object':
+            self.low_scale,self.middle_scale,self.high_scale = self.feedforward_network_object(input_env[0])
+        else:
+            raise Exception("Task property can be either trace_curve or trace_object")
+            
         while (i < self.duration and norm > 0) or flag:
 
             prevY2mod = self.Y2mod.detach()
@@ -295,14 +297,4 @@ class RecurrentNetwork():
         self.middle_scale_layer.to(self.device)
         self.high_scale_layer.to(self.device)
         self.output_layer.to(self.device)
-
-    def copy(self):
-      n_copy = RecurrentNetwork(4,self.grid_size,self.big_pixels_size,self.bigger_pixels_size,self.device,self.low_scale_feedforward,self.middle_scale_feedforward_interm,self.middle_scale_feedforward,self.high_scale_feedforward_interm,self.high_scale_feedforward)
-      n_copy.input_layer = deepcopy(self.input_layer)
-      n_copy.low_scale_layer = deepcopy(self.low_scale_layer)
-      n_copy.middle_scale_layer = deepcopy(self.middle_scale_layer)
-      n_copy.high_scale_layer = deepcopy(self.high_scale_layer)
-      n_copy.output_layer = deepcopy(self.output_layer)
-      return n_copy
-
 
