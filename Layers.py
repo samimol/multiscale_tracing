@@ -198,8 +198,8 @@ class InputLayer(CustomLayer):
         self.inhib_mask = self.make_mask(self.wie.weight)
         self.feedforward_mask = self.make_mask(self.t.weight)
 
-    def forward(self, upper_y, upper_ymod, input):
-        Y = input[0]
+    def forward(self, upper_y, upper_ymod, input_stimulus):
+        Y = input_stimulus
         VIP = self.step_function(self.umod(upper_ymod)) 
         SOM = self.activation_function(1 - VIP)
         Ymod =  self.activation_function((-self.wie(SOM)) * self.gating_function(Y))

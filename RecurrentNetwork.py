@@ -88,9 +88,9 @@ class RecurrentNetwork():
         flag = True
 
         if self.task == 'trace_curve':
-            self.low_scale,self.middle_scale,self.high_scale = self.feedforward_network_curve(input_env[0])
+            self.low_scale,self.middle_scale,self.high_scale = self.feedforward_network_curve(input_env)
         elif self.task == 'trace_object':
-            self.low_scale,self.middle_scale,self.high_scale = self.feedforward_network_object(input_env[0])
+            self.low_scale,self.middle_scale,self.high_scale = self.feedforward_network_object(input_env)
         else:
             raise Exception("Task property can be either trace_curve or trace_object")
             
@@ -274,9 +274,9 @@ class RecurrentNetwork():
             self.delta = reward - exp_value
 
         (Zy6mod,Zvip6,Zsom6,
-            Zy3mod,Zvip3,Zsom3,
-                Zy2mod,Zvip2,Zsom2,
-                Zxmod,Zvip0,Zsom0) = self.accessory()
+         Zy3mod,Zvip3,Zsom3,
+         Zy2mod,Zvip2,Zsom2,
+         Zxmod,Zvip0,Zsom0) = self.accessory()
 
         self.input_layer.update_layer([self.Xmod,self.SOM0,self.VIP0], [Zxmod,Zsom0,Zvip0], self.beta, self.delta)
         self.low_scale_layer.update_layer([self.Y2,self.Y2mod,self.SOM2,self.VIP2], [None,Zy2mod,Zsom2,Zvip2], self.beta, self.delta,train_v=False)

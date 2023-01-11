@@ -182,19 +182,17 @@ def test_network(t,CurveLength,grid_size,TrialNumber,n,device,save_activities,ve
     for p in range(TrialNumber):
       trial_running = True
       display.append([])
-      i=0
       new_input, reward, trialEnd= t.do_step(action)
       while trial_running:
         action = n.do_step(new_input,reward,trialEnd,device)
         new_input, reward, trialEnd = t.do_step(action)
-        display[p].append(new_input[0])
+        display[p].append(new_input)
         if trialEnd:
           trial_running = False
           if reward == 0:
             corrects.append(0)
           else:
             corrects.append(1)
-        i = i + 1
       target_history.append(t.target_curve)
       distr_history.append(t.distractor_curve) 
     if verbose:

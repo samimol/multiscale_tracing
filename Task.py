@@ -46,9 +46,6 @@ class Task():
         self.flowcontrol = {'intertrial': self.do_intertrial,
                             'go': self.do_go}
 
-        if self.task_type != 'searchtrace' and self.task_type != 'trace' and self.task_type != 'tracesearch':
-            raise Exception('Task type must be either searchtrace or trace or tracesearch')
-
     def state_reset(self):
         self.trial_ended = True
         self.state = 'intertrial'
@@ -64,9 +61,10 @@ class Task():
         return(input, reward, trial_ended)
 
     def do_intertrial(self, action):
-            self.pick_trial_type()
-            self.input = [self.display, self.display_disk]
-            self.state = 'go'
+        object_1,object_2 = self.pick_object()
+        self.draw_stimulus(object_1,object_2)
+        self.input = self.display
+        self.state = 'go'
 
 
     def do_go(self, action):
@@ -76,20 +74,10 @@ class Task():
             self.state_reset()
         else:
             self.state_reset()
-
-    def pick_trial_type(self):
-        position_red_marker = np.random.randint(2)
-        position_yellow_marker = 1 if position_red_marker == 0 else 0
-        self.position_markers = [position_red_marker, position_yellow_marker]
-        self.feature_target = np.random.randint(2) 
-        object_1,object_2 = self.pick_object()
-        self.draw_stimulus(object_1,object_2)
-
-        
+       
 class TraceCurves(Task):
     
     def __init__(self,n_hidden_features,device,middle_pixel_size,big_pixel_size,object_1=[],object_2=[]):
-        self.task_type = 'trace'
         super().__init__(n_hidden_features,device,object_1,object_2)
         
         self.middle_pixel_size = middle_pixel_size
@@ -192,7 +180,6 @@ class TraceCurves(Task):
 class TraceObjects(Task):
     
     def __init__(self,n_hidden_features,device,object_1=[],object_2=[]):
-        self.task_type = 'trace'
         super().__init__(n_hidden_features,device,object_1,object_2)
 
     def pick_object(self):
