@@ -169,27 +169,19 @@ class CustomLayer(nn.Module):
                 
 class InputLayer(CustomLayer):
 
-    def __init__(self, feature_in, feature_out,big_pixels_size):
+    def __init__(self, feature_in, feature_out):
         super().__init__()
         self.layer_type = 'input'
         K_size = 3
-        self.change_scale_ff = False
-        self.change_scale_fb = False
-        self.higher_scale = False
-        self.big_pixels_size = big_pixels_size
-        self.upper_ymod = True
 
-        self.t = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same')
         self.umod = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same',bias=False)
         self.wie = nn.Conv2d(feature_in, feature_in, K_size, stride=1, padding='same',bias=True)
 
         # Initializing weights
-        self.init_weights_FF(self.t,one_to_one=True)
         self.init_weights_FB(self.umod)
         self.init_weights_inhib(self.wie)
 
         # Setting the mask to have connections only between neighboours
-        self.feedforward_mask = self.make_mask(self.t.weight)
         self.feedback_mask = self.make_mask(self.umod.weight)
         self.inhib_mask = self.make_mask(self.wie.weight)
 
@@ -262,15 +254,13 @@ class OutputLayer(CustomLayer):
         super().__init__()
         self.grid_size = grid_size
         K_size = 2 * self.grid_size - 1
-        self.change_scale_ff = False
         self.layer_type = 'output'
-        self.higher_scale = False
         self.grid_size = grid_size
-        self.upper_ymod = False
         self.big_pixels_size = big_pixels_size
         self.bigger_pixels_size = bigger_pixels_size
         self.hidden_features = hidden_features
         self.feature_out = feature_out
+        
         self.high_to_output = nn.ConvTranspose2d(6, 1,2 * self.grid_size - 1, stride=self.bigger_pixels_size, padding=int(0.5*(2 * self.grid_size - 1 - self.bigger_pixels_size)),bias=False)#nn.ConvTranspose2d(6, feature_out, 3, stride=3, padding=0,bias=False)
         self.low_to_output = nn.Conv2d(hidden_features, feature_out, K_size, stride=1, padding='same',bias=False)
         self.middle_to_output = nn.ConvTranspose2d(6, 1,2 * self.grid_size - 1, stride=self.big_pixels_size, padding=int(0.5*(2 * self.grid_size - 1 - self.big_pixels_size)),bias=False)
@@ -330,10 +320,10 @@ class OutputLayer(CustomLayer):
                               
         
     def update_layer(self, upper, beta, delta):
-            self.input_to_output = self.update_weight(self.input_to_output, upper, beta, delta, average=False)
-            self.low_to_output = self.update_weight(self.low_to_output, upper, beta, delta,self.low_to_output_mask, receptive_field_size = 1)
-            self.middle_to_output = self.update_weight(self.middle_to_output, upper, beta, delta,self.middle_to_output_mask, receptive_field_size=self.big_pixels_size)
-            self.high_to_output = self.update_weight(self.high_to_output, upper, beta, delta, self.high_to_output_mask,receptive_field_size = self.bigger_pixels_size)
+        self.input_to_output = self.update_weight(self.input_to_output, upper, beta, delta, average=False)
+        self.low_to_output = self.update_weight(self.low_to_output, upper, beta, delta,self.low_to_output_mask, receptive_field_size = 1)
+        self.middle_to_output = self.update_weight(self.middle_to_output, upper, beta, delta,self.middle_to_output_mask, receptive_field_size=self.big_pixels_size)
+        self.high_to_output = self.update_weight(self.high_to_output, upper, beta, delta, self.high_to_output_mask,receptive_field_size = self.bigger_pixels_size)
 
 class FFLayer(CustomLayer):
 
@@ -362,5 +352,5 @@ class FFLayer(CustomLayer):
         # Keeping only the neurons with high probability of activation
         middle_scale = torch.relu(middle_scale - 0.6)
         high_scale = torch.relu(high_scale - 0.6)
-
+    
         return low_scale.detach(),middle_scale.detach(),high_scale.detach()

@@ -30,7 +30,7 @@ class RecurrentNetwork():
 
         self.device = device
 
-        self.input_layer = InputLayer(self.n_input_features, self.n_hidden_features,self.big_pixels_size)
+        self.input_layer = InputLayer(self.n_input_features, self.n_hidden_features)
         self.low_scale_layer = HiddenLayer(self.n_input_features, self.n_hidden_features, 6,self.big_pixels_size,grid_size,change_scale_fb=True)
         self.middle_scale_layer = HiddenLayer(self.n_hidden_features, 6,self.high_feature,self.big_pixels_size,grid_size,change_scale_ff=True,higher_scale=True,change_scale_fb=True,upper_ymod=True)
         self.high_scale_layer = HiddenLayer(self.high_feature,6,self.high_feature,self.bigger_pixels_size//self.big_pixels_size,grid_size,upper_ymod = False,change_scale_ff=True)
@@ -108,7 +108,7 @@ class RecurrentNetwork():
                 self.saveY3mod[len(self.saveY3mod) - 1].append(self.Y3mod.detach())
                 self.saveY6mod[len(self.saveY6mod) - 1].append(self.Y6mod.detach())
           
-                self.Z = self.calc_Output(device)
+                self.Z = self.calc_output(device)
                 self.saveQ[len(self.saveQ) - 1].append(self.Z.detach())
 
             with torch.no_grad():
