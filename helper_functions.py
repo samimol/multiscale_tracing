@@ -259,56 +259,6 @@ def attention_dynamics(ar,CurveLength,grid_size,max_dur,corrects,object_1,object
         curves[l] = curves[l][~np.all(curves[l] == 0, axis=0)]
     return(curves)
 
-                        
-def model_latency(object_1,grid_size,middle_scale_RF_size,big_scale_RF_size,middle_scale_activity,high_scale_activity):
-        # Get the modelled latency if the spreading follow a growth-cone model for all the pixels in object_1
-
-    middle_grid_size = grid_size // middle_scale_RF_size
-    big_grid_size = grid_size // big_scale_RF_size
-
-    curve1_middle = [((object_1[i] // grid_size) // middle_scale_RF_size)*middle_grid_size + (object_1[i] % grid_size) // middle_scale_RF_size for i in range(len(object_1))]
-    curve1_big = [((object_1[i] // grid_size) // big_scale_RF_size)*big_grid_size + (object_1[i] % grid_size) // big_scale_RF_size for i in range(len(object_1))]
-
-    groups_middle = np.split(np.array(curve1_middle), np.where(np.diff(np.array(curve1_middle)) != 0)[0]+1)
-    groups_big = np.split(np.array(curve1_big), np.where(np.diff(np.array(curve1_big)) != 0)[0]+1)
-
-    latency_middle = [0]
-    for i in range(len(groups_middle)):
-        if middle_scale_activity[0,0,groups_middle[i][0]%middle_grid_size,groups_middle[i][0]//middle_grid_size] > 0:
-            for j in range(len(groups_middle[i])):
-                latency_middle.append(latency_middle[-1-j]+1)
-        else:
-            for j in range(len(groups_middle[i])):
-                latency_middle.append(latency_middle[-1]+1)
-    latency_middle.remove(0)
-    latency_middle
-
-    latency_big = [0]
-    for i in range(len(groups_big)):
-        if high_scale_activity[0,0,groups_big[i][0]%big_grid_size,groups_big[i][0]//big_grid_size] > 0:
-            for j in range(len(groups_big[i])):
-                latency_big.append(latency_big[-1-j]+1)
-        else:
-            for j in range(len(groups_big[i])):
-                latency_big.append(latency_big[-1]+1)
-    latency_big.remove(0)
-
-    latency = []
-    for i in range(len(latency_big)):
-        if latency_big[i] == latency_middle[i]:
-            latency.append(latency_big[i])
-        elif latency_big[i] > latency_middle[i]:
-            latency.append(latency_middle[i])
-            dif = latency_big[i] - latency_middle[i]
-            for j in range(i,len(latency_big)):
-                latency_big[j] = latency_big[j] - dif
-        elif latency_middle[i] > latency_big[i]:
-            latency.append(latency_big[i])
-            dif = latency_middle[i] - latency_big[i]
-            for j in range(i,len(latency_middle)):
-                latency_middle[j] = latency_middle[j] - dif
-    
-    return latency
 
 def real_latency(curves,threshold,correct):
     # Get the actual latency for all the dynamics of attention spreading given by curves
@@ -331,33 +281,39 @@ def distance_from_fixation_point(low_grid,middle_grid,high_grid, start,end,pixel
     queue = collections.deque([start])
     width = low_grid.shape[0]
     height = low_grid.shape[1]
+    low_grid[start[0],start[1]] = 1
     low_grid[end[0],end[1]] = 1
     middle_pixel_size = 3
     big_pixel_size = 9
-    distance_grid = np.ones_like(low_grid)
+    distance_grid = np.zeros_like(low_grid)
+    distance_grid[start] = 1
     while queue:
         path = queue.popleft()
         x = path[0]
         y = path[1]
-        last_distance = distance_grid[x][y]
         possible_coordinates = [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]
+        last_distance = distance_grid[x,y]
         for k in range(len(possible_coordinates)):
             x2 = possible_coordinates[k][0]
             y2 = possible_coordinates[k][1]
-            if 0 <= x2 < width and 0 <= y2 < height and low_grid[x2][y2] == 1 and distance_grid[x2][y2] == 1:
-                middle_coordinate = (x2 // middle_pixel_size,y2 // middle_pixel_size)
-                big_coordinate = (x2 // big_pixel_size,y2 // big_pixel_size)
+            if 0 <= x2 < width and 0 <= y2 < height and low_grid[x2][y2] > 0 and distance_grid[x2][y2] == 0 and last_distance>0:
+                middle_coordinate = (x2 // middle_pixel_size, y2 // middle_pixel_size)
+                big_coordinate = (x2 // big_pixel_size, y2 // big_pixel_size)
                 if pixel_by_pixel:
                     distance_grid[x2,y2] = last_distance + 1
                     queue.append([x2,y2])
                 else:
                     if high_grid[big_coordinate[0],big_coordinate[1]] > 0:
-                        distance_grid[big_coordinate[0]*big_pixel_size:big_coordinate[0]*big_pixel_size+big_pixel_size,big_coordinate[1]*big_pixel_size:big_coordinate[1]*big_pixel_size+big_pixel_size] = last_distance + 1
+                        distance_grid_interm = distance_grid[big_coordinate[0]*big_pixel_size:big_coordinate[0]*big_pixel_size+big_pixel_size,big_coordinate[1]*big_pixel_size:big_coordinate[1]*big_pixel_size+big_pixel_size] 
+                        low_grid_interm = low_grid[big_coordinate[0]*big_pixel_size:big_coordinate[0]*big_pixel_size+big_pixel_size,big_coordinate[1]*big_pixel_size:big_coordinate[1]*big_pixel_size+big_pixel_size]
+                        distance_grid_interm[np.where(low_grid_interm==1)] = last_distance + 1
                         for i in range(big_pixel_size):
                             for j in range(big_pixel_size):
                                 queue.append([big_coordinate[0]*big_pixel_size+i,big_coordinate[1]*big_pixel_size+j])
                     elif middle_grid[middle_coordinate[0],middle_coordinate[1]] > 0:
-                        distance_grid[middle_coordinate[0]*middle_pixel_size:middle_coordinate[0]*middle_pixel_size+middle_pixel_size,middle_coordinate[1]*middle_pixel_size:middle_coordinate[1]*middle_pixel_size+middle_pixel_size] = last_distance + 1
+                        distance_grid_interm = distance_grid[middle_coordinate[0]*middle_pixel_size:middle_coordinate[0]*middle_pixel_size+middle_pixel_size,middle_coordinate[1]*middle_pixel_size:middle_coordinate[1]*middle_pixel_size+middle_pixel_size]
+                        low_grid_interm = low_grid[middle_coordinate[0]*middle_pixel_size:middle_coordinate[0]*middle_pixel_size+middle_pixel_size,middle_coordinate[1]*middle_pixel_size:middle_coordinate[1]*middle_pixel_size+middle_pixel_size]
+                        distance_grid_interm[np.where(low_grid_interm==1)] = last_distance + 1             
                         for i in range(middle_pixel_size):
                             for j in range(middle_pixel_size):
                                 queue.append([middle_coordinate[0]*middle_pixel_size+i,middle_coordinate[1]*middle_pixel_size+j])
