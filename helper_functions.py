@@ -329,7 +329,6 @@ def real_latency(curves,threshold,correct):
 
 def distance_from_fixation_point(low_grid,middle_grid,high_grid, start,end,pixel_by_pixel=False):
     queue = collections.deque([start])
-    seen = set([start])
     width = low_grid.shape[0]
     height = low_grid.shape[1]
     low_grid[end[0],end[1]] = 1
