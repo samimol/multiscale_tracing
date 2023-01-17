@@ -37,6 +37,8 @@ class Task():
         self.object_2 = object_2
 
         self.device = device
+        
+        self.euclidean_distance = 0
 
         
         self.n_hidden_features = n_hidden_features
@@ -199,6 +201,7 @@ class TraceObjects(Task):
                 yblue = object_1[-1] // self.grid_size  
                 dist = np.sqrt((xred-xblue)**2+(yred-yblue)**2)
                 np.random.shuffle(object_2)
+            self.euclidean_distance = dist
         else:
             object_1 = self.object_1
             object_2 = self.object_2           

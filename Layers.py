@@ -286,7 +286,7 @@ class OutputLayer(CustomLayer):
         Y =  self.input_to_output(inputmod) + self.low_to_output(low_scale) + self.middle_to_output(middle_scale) + self.high_to_output(high_scale)
         return(Y)
 
-    def rescale(self,new_grid_size):
+    def rescale(self,new_grid_size,device):
         high_to_output = nn.ConvTranspose2d(6, 1,2 * new_grid_size - 1, stride=self.bigger_pixels_size, padding=int(0.5*(2 * new_grid_size - 1 - self.bigger_pixels_size)),bias=False)#nn.ConvTranspose2d(6, feature_out, 3, stride=3, padding=0,bias=False)
         low_to_output = nn.Conv2d(self.hidden_features, self.feature_out, 2 * self.grid_size - 1, stride=1, padding='same',bias=False)
         middle_to_output = nn.ConvTranspose2d(6, 1,2 * new_grid_size - 1, stride=self.big_pixels_size, padding=int(0.5*(2 * new_grid_size - 1 - self.big_pixels_size)),bias=False)
@@ -299,6 +299,7 @@ class OutputLayer(CustomLayer):
         high_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = test.T
         high_to_output.weight = torch.nn.Parameter(high_to_output_weight)
         self.high_to_output = high_to_output
+        self.high_to_output.to(device)
         
         middle_to_output_weight = torch.zeros_like(middle_to_output.weight)
         lower_bound = int(0.5*(2*new_grid_size-1-self.big_pixels_size))
@@ -308,6 +309,7 @@ class OutputLayer(CustomLayer):
         middle_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = test.T
         middle_to_output.weight = torch.nn.Parameter(middle_to_output_weight)
         self.middle_to_output = middle_to_output
+        self.middle_to_output.to(device)
         
         low_to_output_weight = torch.zeros_like(low_to_output.weight)
         lower_bound = int(0.5*(2*new_grid_size-1-1))
@@ -317,6 +319,9 @@ class OutputLayer(CustomLayer):
         low_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = test.T
         low_to_output.weight = torch.nn.Parameter(low_to_output_weight)
         self.low_to_output = low_to_output
+        self.low_to_output.to(device)
+        
+          
                               
         
     def update_layer(self, upper, beta, delta):

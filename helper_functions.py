@@ -10,6 +10,7 @@ from scipy.special import binom
 import random
 from skimage.draw import polygon
 import scipy.interpolate
+import collections
 
 def make_curves(curve, mask_original,curve_length,grid_size=3,direction=None):
     mask = mask_original.copy()
@@ -229,7 +230,7 @@ def get_extremity(data,pixels,grid_size):
         if neighbours == 1:
             return(x,y)
 
-def attention_dynamics(ar,CurveLength,grid_size,max_dur,corrects,object_1,object_2):
+def attention_dynamics(ar,CurveLength,grid_size,max_dur,corrects,object_1,object_2,cpu=False):
     # Get the dynamics of the spreading of attention for all the pixels of the objects if they are curve, only for the last one if they are object
     feat = 0  
     p = 1
@@ -239,12 +240,16 @@ def attention_dynamics(ar,CurveLength,grid_size,max_dur,corrects,object_1,object
         target_hist = object_1
         distr_hist = object_2
         for i in range(dur):
+            if cpu:
+                ar[p][i] = ar[p][i].cpu()
             if CurveLength > 1:
                 curves[0][i] = ar[p][i][0,feat,target_hist[0] % grid_size, target_hist[0] //grid_size] - ar[p][i][0,feat,distr_hist[0]%grid_size,distr_hist[0]//grid_size]
                 for l in range(1,CurveLength-1):
                     curves[l][i] = ar[p][i][0,feat,target_hist[l]%grid_size,target_hist[l]//grid_size] -  ar[p][i][0,feat,distr_hist[l]%grid_size,distr_hist[l]//grid_size]
             curves[CurveLength-1][i] = ar[p][i][0,feat,target_hist[-1]%grid_size,target_hist[-1]//grid_size] -  ar[p][i][0,feat,distr_hist[-1]%grid_size,distr_hist[-1]//grid_size]
             if dur < max_dur:
+                if cpu:
+                    ar[p][-1] = ar[p][-1].cpu()
                 if CurveLength > 1:
                     curves[0][dur:] = ar[p][-1][0,feat,target_hist[0] % grid_size, target_hist[0] //grid_size] - ar[p][-1][0,feat,distr_hist[0]%grid_size,distr_hist[0]//grid_size]
                     for l in range(1,CurveLength-1):
@@ -305,18 +310,59 @@ def model_latency(object_1,grid_size,middle_scale_RF_size,big_scale_RF_size,midd
     
     return latency
 
-def real_latency(curves,threshold):
+def real_latency(curves,threshold,correct):
     # Get the actual latency for all the dynamics of attention spreading given by curves
     number_interpolation_points = 500
     latency_all = []
     for i in range(len(curves)):
-        latency_interm = []
-        max_dur =curves[i][0].shape[1] 
-        CurveLength = len(curves[i])
-        for l in range(CurveLength):
-            interpollation_function = scipy.interpolate.interp1d(np.arange(0,max_dur), curves[i][l], kind='linear',axis=-1)
-            interpolated = interpollation_function(np.linspace(0, max_dur-1, num=number_interpolation_points))
-            latency = np.where(interpolated > threshold*np.max(interpolated))[1][0]
-            latency_interm.append(np.linspace(0, max_dur-1, num=number_interpolation_points)[latency])
-        latency_all.append(latency_interm)
+        if correct[i] == 1:
+            latency_interm = []
+            max_dur =curves[i][0].shape[1] 
+            CurveLength = len(curves[i])
+            for l in range(CurveLength):
+                interpollation_function = scipy.interpolate.interp1d(np.arange(0,max_dur), curves[i][l], kind='linear',axis=-1)
+                interpolated = interpollation_function(np.linspace(0, max_dur-1, num=number_interpolation_points))
+                latency = np.where(interpolated > threshold*np.max(interpolated))[1][0]
+                latency_interm.append(np.linspace(0, max_dur-1, num=number_interpolation_points)[latency])
+            latency_all.append(latency_interm)
     return(latency_all)
+
+def distance_from_fixation_point(low_grid,middle_grid,high_grid, start,end,pixel_by_pixel=False):
+    queue = collections.deque([start])
+    seen = set([start])
+    width = low_grid.shape[0]
+    height = low_grid.shape[1]
+    low_grid[end[0],end[1]] = 1
+    middle_pixel_size = 3
+    big_pixel_size = 9
+    distance_grid = np.ones_like(low_grid)
+    while queue:
+        path = queue.popleft()
+        x = path[0]
+        y = path[1]
+        last_distance = distance_grid[x][y]
+        possible_coordinates = [(x+1,y), (x-1,y), (x,y+1), (x,y-1)]
+        for k in range(len(possible_coordinates)):
+            x2 = possible_coordinates[k][0]
+            y2 = possible_coordinates[k][1]
+            if 0 <= x2 < width and 0 <= y2 < height and low_grid[x2][y2] == 1 and distance_grid[x2][y2] == 1:
+                middle_coordinate = (x2 // middle_pixel_size,y2 // middle_pixel_size)
+                big_coordinate = (x2 // big_pixel_size,y2 // big_pixel_size)
+                if pixel_by_pixel:
+                    distance_grid[x2,y2] = last_distance + 1
+                    queue.append([x2,y2])
+                else:
+                    if high_grid[big_coordinate[0],big_coordinate[1]] > 0:
+                        distance_grid[big_coordinate[0]*big_pixel_size:big_coordinate[0]*big_pixel_size+big_pixel_size,big_coordinate[1]*big_pixel_size:big_coordinate[1]*big_pixel_size+big_pixel_size] = last_distance + 1
+                        for i in range(big_pixel_size):
+                            for j in range(big_pixel_size):
+                                queue.append([big_coordinate[0]*big_pixel_size+i,big_coordinate[1]*big_pixel_size+j])
+                    elif middle_grid[middle_coordinate[0],middle_coordinate[1]] > 0:
+                        distance_grid[middle_coordinate[0]*middle_pixel_size:middle_coordinate[0]*middle_pixel_size+middle_pixel_size,middle_coordinate[1]*middle_pixel_size:middle_coordinate[1]*middle_pixel_size+middle_pixel_size] = last_distance + 1
+                        for i in range(middle_pixel_size):
+                            for j in range(middle_pixel_size):
+                                queue.append([middle_coordinate[0]*middle_pixel_size+i,middle_coordinate[1]*middle_pixel_size+j])
+                    else:
+                        distance_grid[x2,y2] = last_distance + 1
+                        queue.append([x2,y2])
+    return(distance_grid)
