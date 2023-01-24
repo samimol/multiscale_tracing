@@ -15,7 +15,7 @@ class FeedforwardNetwork(nn.Module):
 
         feats = 6
 
-        self.low_scale_feedforward = nn.Conv2d(4, 1, 1,stride=1,padding='same',bias=False,device=device)
+        self.low_scale_feedforward = nn.Conv2d(3, 1, 1,stride=1,padding='same',bias=False,device=device)
         self.low_scale_feedforward.weight = torch.nn.Parameter(torch.rand(self.low_scale_feedforward.weight.shape))
         
         self.middle_scale_feedforward_interm = nn.Conv2d(1,feats, 3, stride=1,padding='same', bias=True,device=device)    
