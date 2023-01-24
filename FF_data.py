@@ -15,7 +15,7 @@ def make_dataset_curve(grid_size,big_pixel_size,other_big_pixel_size,num_trial,d
     big_grid_size = grid_size // big_pixel_size
     other_big_grid_size = grid_size // other_big_pixel_size
     num_trial = num_trial
-    feature_number = 4
+    feature_number = 3
     input_list = torch.zeros((num_trial,feature_number,grid_size,grid_size),device=device)
     labels = torch.zeros((num_trial,1,big_grid_size,big_grid_size),device=device)
     labels_other = torch.zeros((num_trial,1,other_big_grid_size,other_big_grid_size),device=device)
@@ -49,18 +49,18 @@ def make_dataset_curve(grid_size,big_pixel_size,other_big_pixel_size,num_trial,d
                             elif  curvelength > 2 and curvelength < big_pixel_size*2 and big_pixel_size == 3:
                                 curve1.pop(random.randrange(len(curve1))) 
                     for i in range(1,len(curve1)-1):
-                      kernel[0,2,curve1[i]%big_pixel_size,curve1[i]//big_pixel_size] = 1
-                    feat1 = np.random.choice([0,2,-1])
+                      kernel[0,1,curve1[i]%big_pixel_size,curve1[i]//big_pixel_size] = 1
+                    feat1 = np.random.choice([0,1,-1])
                     kernel[0,feat1,curve1[0]%big_pixel_size,curve1[0]//big_pixel_size] = 1
-                    feat2 = [0,2,-1]
+                    feat2 = [0,1,-1]
                     feat2.remove(feat1)
                     kernel[0,np.random.choice(feat2),curve1[-1]%big_pixel_size,curve1[-1]//big_pixel_size] = 1
                     if twocurves:
                         for i in range(1,len(curve2)-1):
-                          kernel[0,2,curve2[i]%big_pixel_size,curve2[i]//big_pixel_size] = 1
-                        feat1 = np.random.choice([0,2,-1])
+                          kernel[0,1,curve2[i]%big_pixel_size,curve2[i]//big_pixel_size] = 1
+                        feat1 = np.random.choice([0,1,-1])
                         kernel[0,feat1,curve2[0]%big_pixel_size,curve2[0]//big_pixel_size] = 1
-                        feat2 = [0,2,-1]
+                        feat2 = [0,1,-1]
                         feat2.remove(feat1)
                         kernel[0,np.random.choice(feat2),curve2[-1]%big_pixel_size,curve2[-1]//big_pixel_size] = 1    
                     break
@@ -93,7 +93,7 @@ def make_dataset_blob(grid_size,big_pixel_size,other_big_pixel_size,num_trial,de
     big_grid_size = grid_size // big_pixel_size
     other_big_grid_size = grid_size // other_big_pixel_size
     num_trial = num_trial
-    feature_number = 4
+    feature_number = 3
     input_list = torch.zeros((num_trial,feature_number,grid_size,grid_size),device=device)
     labels = torch.zeros((num_trial,1,big_grid_size,big_grid_size),device=device)
     labels_other = torch.zeros((num_trial,1,other_big_grid_size,other_big_grid_size),device=device)
@@ -111,12 +111,12 @@ def make_dataset_blob(grid_size,big_pixel_size,other_big_pixel_size,num_trial,de
               y0 = y_blob[ind[0]]
               x_target = x_blob[ind[1]]
               y_target = y_blob[ind[1]]
-              input[2,x_blob,y_blob] = 1
-              input[2,x0,y0] = 0
-              input[3,x0,y0] = 1
+              input[1,x_blob,y_blob] = 1
+              input[1,x0,y0] = 0
+              input[2,x0,y0] = 1
               if np.random.rand() < 0.5: #we put a blue pixel
                 input[0,x_target,y_target] = 1
-                input[2,x_target,y_target] = 0
+                input[1,x_target,y_target] = 0
               break
             except IndexError:
                       pass
