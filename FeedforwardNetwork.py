@@ -27,6 +27,8 @@ class FeedforwardNetwork(nn.Module):
 
         
         self.sig = nn.Sigmoid()
+        
+        self.loss = []
                
     def forward(self, x):
         
@@ -43,11 +45,10 @@ class FeedforwardNetwork(nn.Module):
         return middle_scale, high_scale
     
     
-    def train(self,optimizer,criterion,input_list,labels,epochs=2,verbose=False,print_frequency=2000):
+    def train(self,optimizer,criterion,input_list,labels,epochs=2,verbose=False,print_frequency=2000,batch_size=1):
         for epoch in range(epochs):  # loop over the dataset multiple times
             running_loss = 0.0
             count = 0
-            batch_size = 1
             permut = list(range(len(labels[0])))
             random.shuffle(permut)
             for i in range(0,len(labels[0]),batch_size):
@@ -70,6 +71,7 @@ class FeedforwardNetwork(nn.Module):
                 optimizer.step()
     
                 running_loss += loss.item()
+                self.loss.append(loss.cpu().detach().numpy())
                 if verbose:
                     if count % print_frequency == print_frequency - 1:    # print every 2000 mini-batches
                         print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.15f}')

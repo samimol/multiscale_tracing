@@ -146,16 +146,16 @@ class TraceCurves(Task):
             if i == 0:  # red
                 display[:, 0, object_1[0] % self.grid_size, object_1[0]//self.grid_size] = 1
             elif i == len(object_1)-1:  # blue
-                display[:, 3, object_1[i] % self.grid_size, object_1[i]//self.grid_size] = 1
-            else:  # green
                 display[:, 2, object_1[i] % self.grid_size, object_1[i]//self.grid_size] = 1
+            else:  # green
+                display[:, 1, object_1[i] % self.grid_size, object_1[i]//self.grid_size] = 1
         for i in range(len(object_2)):
             if i == 0:
-                display[:, 2, object_2[0] % self.grid_size, object_2[0]//self.grid_size] = 1
+                display[:, 1, object_2[0] % self.grid_size, object_2[0]//self.grid_size] = 1
             elif i == len(object_2)-1:
-                display[:, 3, object_2[i] % self.grid_size, object_2[i]//self.grid_size] = 1
-            else:
                 display[:, 2, object_2[i] % self.grid_size, object_2[i]//self.grid_size] = 1
+            else:
+                display[:, 1, object_2[i] % self.grid_size, object_2[i]//self.grid_size] = 1
 
         self.target_curve = object_1
         self.distractor_curve = object_2
@@ -211,14 +211,14 @@ class TraceObjects(Task):
         display = torch.zeros((1, self.n_hidden_features, self.grid_size, self.grid_size),device=self.device)
 
         #green  
-        ind = np.unravel_index(object_1[1:-1], display[0,2,:].shape, 'F')
-        display[:,2,ind[0],ind[1]] = 1
-        ind = np.unravel_index(object_2[:-1], display[0,2,:].shape, 'F')
-        display[:,2,ind[0],ind[1]] = 1
+        ind = np.unravel_index(object_1[1:-1], display[0,1,:].shape, 'F')
+        display[:,1,ind[0],ind[1]] = 1
+        ind = np.unravel_index(object_2[:-1], display[0,1,:].shape, 'F')
+        display[:,1,ind[0],ind[1]] = 1
         
         #blue
-        display[:, 3, object_1[-1] % self.grid_size, object_1[-1]//self.grid_size] = 1
-        display[:, 3, object_2[-1] % self.grid_size, object_2[-1]//self.grid_size] = 1
+        display[:, 2, object_1[-1] % self.grid_size, object_1[-1]//self.grid_size] = 1
+        display[:, 2, object_2[-1] % self.grid_size, object_2[-1]//self.grid_size] = 1
         
         #red
         display[:, 0, object_1[0] % self.grid_size, object_1[0]//self.grid_size] = 1
