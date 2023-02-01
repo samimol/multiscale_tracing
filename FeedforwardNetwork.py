@@ -13,7 +13,7 @@ class FeedforwardNetwork(nn.Module):
     def __init__(self,device):
         super().__init__()
 
-        feats = 6
+        feats = 20
 
         self.low_scale_feedforward = nn.Conv2d(3, 1, 1,stride=1,padding='same',bias=False,device=device)
         self.low_scale_feedforward.weight = torch.nn.Parameter(torch.rand(self.low_scale_feedforward.weight.shape))

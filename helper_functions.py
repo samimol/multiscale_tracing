@@ -265,16 +265,15 @@ def real_latency(curves,threshold,correct):
     number_interpolation_points = 500
     latency_all = []
     for i in range(len(curves)):
-        if correct[i] == 1:
-            latency_interm = []
-            max_dur =curves[i][0].shape[1] 
-            CurveLength = len(curves[i])
-            for l in range(CurveLength):
-                interpollation_function = scipy.interpolate.interp1d(np.arange(0,max_dur), curves[i][l], kind='linear',axis=-1)
-                interpolated = interpollation_function(np.linspace(0, max_dur-1, num=number_interpolation_points))
-                latency = np.where(interpolated > threshold*np.max(interpolated))[1][0]
-                latency_interm.append(np.linspace(0, max_dur-1, num=number_interpolation_points)[latency])
-            latency_all.append(latency_interm)
+        latency_interm = []
+        max_dur =curves[i][0].shape[1] 
+        CurveLength = len(curves[i])
+        for l in range(CurveLength):
+            interpollation_function = scipy.interpolate.interp1d(np.arange(0,max_dur), curves[i][l], kind='linear',axis=-1)
+            interpolated = interpollation_function(np.linspace(0, max_dur-1, num=number_interpolation_points))
+            latency = np.where(interpolated > threshold*np.max(interpolated))[1][0]
+            latency_interm.append(np.linspace(0, max_dur-1, num=number_interpolation_points)[latency])
+        latency_all.append(latency_interm)
     return(latency_all)
 
 def distance_from_fixation_point(low_grid,middle_grid,high_grid, start,end,pixel_by_pixel=False):
