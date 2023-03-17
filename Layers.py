@@ -355,7 +355,7 @@ class FFLayer(CustomLayer):
         high_scale = self.sig(self.high_scale_feedforward(high_scale_interm))
         
         # Keeping only the neurons with high probability of activation
-        middle_scale = torch.relu(middle_scale - 0.6)
-        high_scale = torch.relu(high_scale - 0.6)
+        middle_scale = torch.relu(middle_scale - 0.7)
+        high_scale = torch.relu(high_scale - 0.7)
     
         return low_scale.detach(),middle_scale.detach(),high_scale.detach()
