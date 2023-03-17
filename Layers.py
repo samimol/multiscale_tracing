@@ -16,14 +16,7 @@ class CustomLayer(nn.Module):
         super().__init__()
 
     def activation_function(self, x):
-        if self.disinhibition:
-            return torch.relu(x)
-        else:
-            thresh = 6
-            x[x == 0] = 0
-            x = torch.clamp(x, 0)
-            x[thresh <= x] = torch.log(1.5 * x[thresh <= x] + 1) + thresh - torch.log(torch.tensor(1.5 * thresh + 1))
-            return x
+        return torch.relu(x)
 
     def step_function(self,x):
       eps = 1
@@ -45,10 +38,7 @@ class CustomLayer(nn.Module):
         if change_scale:
           for f in range(K.shape[0]):
             for f2 in range(K.shape[1]):
-                if self.disinhibition:
-                    K[f, f2, :, :] = self.initialisation_range * np.random.rand() + 1
-                else:
-                    K[f, f2, :, :] = self.initialisation_range * np.random.rand() + 0.1
+              K[f, f2, :, :] = self.initialisation_range * np.random.rand() + 1
         else:
           for f in range(K.shape[0]):
               for f2 in range(K.shape[1]):
@@ -58,18 +48,12 @@ class CustomLayer(nn.Module):
                       K[f, f2, lower_bound:upper_bound,lower_bound:upper_bound] = 0.001 * np.random.rand()
                   else:
                     if self.layer_type != "output":
-                        if self.disinhibition:
-                            K[f,f2,0] =  self.initialisation_range * np.random.rand() + 1
-                        else:
-                            K[f,f2,0] =  self.initialisation_range * np.random.rand() + 0.1
+                        K[f,f2,0] =  self.initialisation_range * np.random.rand() + 1
                     else:
                         K[f, f2, 0] = 0.001 * np.random.rand()
         if layer.bias is not None:
           for f in range(bias.shape[0]):  
-            if self.disinhibition:
                 bias[f] = 1
-            else:
-                bias[f] = 0
         layer.weight = torch.nn.Parameter(K)
         if layer.bias is not None:
             layer.bias = torch.nn.Parameter(bias)
@@ -77,10 +61,7 @@ class CustomLayer(nn.Module):
     def init_weights_FB(self, layer, change_scale=False):
         K = torch.zeros(layer.weight.shape)
         if layer.bias is not None:
-            bias = torch.zeros(layer.bias.shape)  
-            if self.disinhibition == False:
-                for f in range(bias.shape[0]):  
-                   bias[f] = self.initialisation_range * np.random.rand()                   
+            bias = torch.zeros(layer.bias.shape)                                        
         for f in range(K.shape[0]):
               for f2 in range(K.shape[1]):
                 if self.layer_type != "output":
@@ -188,13 +169,12 @@ class CustomLayer(nn.Module):
                 
 class InputLayer(CustomLayer):
 
-    def __init__(self, feature_in, feature_out,disinhibition):
+    def __init__(self, feature_in, feature_out):
         super().__init__()
         self.layer_type = 'input'
         K_size = 3
-        self.disinhibition = disinhibition
 
-        self.umod = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same',bias=not self.disinhibition)
+        self.umod = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same',bias=False)
         self.wie = nn.Conv2d(feature_in, feature_in, K_size, stride=1, padding='same',bias=True)
 
         # Initializing weights
@@ -207,25 +187,19 @@ class InputLayer(CustomLayer):
 
     def forward(self, upper_y, upper_ymod, input_stimulus):
         Y = input_stimulus
-        if self.disinhibition:
-            VIP = self.step_function(self.umod(upper_ymod)) 
-            SOM = self.activation_function(1 - VIP)
-            Ymod =  self.activation_function((-self.wie(SOM)) * self.gating_function(Y))
-        else:
-            VIP = torch.zeros_like(Y)
-            SOM = torch.zeros_like(Y)
-            Ymod =  self.activation_function(self.umod(upper_ymod) * self.gating_function(Y))           
+        VIP = self.step_function(self.umod(upper_ymod)) 
+        SOM = self.activation_function(1 - VIP)
+        Ymod =  self.activation_function((-self.wie(SOM)) * self.gating_function(Y))
         return(Ymod,VIP,SOM)
 
 
     def update_layer(self, upper, z, beta, delta):
         self.umod = self.update_weight(self.umod, upper[2], beta, delta, self.feedback_mask, z[2],change_scale=False)
-        if self.disinhibition:
-            self.wie = self.update_weight(self.wie, upper[0], beta, delta, self.inhib_mask, z[0],inhib=True)
+        self.wie = self.update_weight(self.wie, upper[0], beta, delta, self.inhib_mask, z[0],inhib=True)
 
 class HiddenLayer(CustomLayer):
 
-    def __init__(self, feature_in_lower, feature_out,feature_in_higher,big_pixels_size,grid_size, disinhibition,upper_ymod=True,change_scale_fb=False,change_scale_ff=False,higher_scale=False):
+    def __init__(self, feature_in_lower, feature_out,feature_in_higher,big_pixels_size,grid_size, upper_ymod=True,change_scale_fb=False,change_scale_ff=False,higher_scale=False):
         super().__init__()
         self.layer_type = 'hidden'
         self.upper_ymod = upper_ymod # If the higher layer has a modulated group
@@ -234,7 +208,6 @@ class HiddenLayer(CustomLayer):
         self.higher_scale = higher_scale
         self.big_pixels_size = big_pixels_size
         self.grid_size = grid_size
-        self.disinhibition = disinhibition
         
         # Making the weights
         if self.change_scale_ff:
@@ -261,20 +234,12 @@ class HiddenLayer(CustomLayer):
 
     def forward(self,current_y, lower_ymod=None, upper_ymod=None,horiz=None):
         FF = self.t(lower_ymod)
-        if self.disinhibition:
-            if upper_ymod is not None:
-                VIP = self.step_function(self.umod(upper_ymod) + self.horiz(horiz)) #* self.gating_function(Y)
-            else:
-                VIP = self.step_function(self.horiz(horiz)) #* self.gating_function(Y)
-            SOM = self.activation_function(1 - VIP)
-            current_ymod =  self.activation_function((FF-SOM) * self.gating_function(current_y))
+        if upper_ymod is not None:
+            VIP = self.step_function(self.umod(upper_ymod) + self.horiz(horiz)) #* self.gating_function(Y)
         else:
-            VIP = torch.zeros_like(FF)
-            SOM = torch.zeros_like(FF)
-            if upper_ymod is not None:
-                current_ymod = self.activation_function((FF + self.umod(upper_ymod) + self.horiz(horiz)) * self.gating_function(current_y)) #* self.gating_function(Y)
-            else:
-                current_ymod = self.activation_function((FF + self.horiz(horiz)) * self.gating_function(current_y)) #* self.gating_function(Y)
+            VIP = self.step_function(self.horiz(horiz)) #* self.gating_function(Y)
+        SOM = self.activation_function(1 - VIP)
+        current_ymod =  self.activation_function((FF-SOM) * self.gating_function(current_y))
         return(current_ymod,VIP,SOM)
         
     def update_layer(self, upper, z, beta, delta,train_v=True):
@@ -390,7 +355,7 @@ class FFLayer(CustomLayer):
         high_scale = self.sig(self.high_scale_feedforward(high_scale_interm))
         
         # Keeping only the neurons with high probability of activation
-        middle_scale = torch.relu(middle_scale - 0.7)
-        high_scale = torch.relu(high_scale - 0.7)
+        middle_scale = torch.relu(middle_scale - 0.6)
+        high_scale = torch.relu(high_scale - 0.6)
     
         return low_scale.detach(),middle_scale.detach(),high_scale.detach()

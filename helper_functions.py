@@ -234,8 +234,8 @@ def attention_dynamics(ar,CurveLength,grid_size,max_dur,corrects,object_1,object
     # Get the dynamics of the spreading of attention for all the pixels of the objects if they are curve, only for the last one if they are object
     feat = 0  
     p = 1
+    curves = [np.zeros((max_dur)) for i in range(CurveLength)]
     dur = len(ar[p])
-    curves = [np.zeros(max(dur,max_dur)) for i in range(CurveLength)]
     if corrects[p-1] == 1:
         target_hist = object_1
         distr_hist = object_2
@@ -265,18 +265,16 @@ def real_latency(curves,threshold,correct):
     number_interpolation_points = 500
     latency_all = []
     for i in range(len(curves)):
-        latency_interm = []
-        max_dur =curves[i][0].shape[1] 
-        CurveLength = len(curves[i])
-        if correct[i]:
+        if correct[i] == 1:
+            latency_interm = []
+            max_dur =curves[i][0].shape[1] 
+            CurveLength = len(curves[i])
             for l in range(CurveLength):
                 interpollation_function = scipy.interpolate.interp1d(np.arange(0,max_dur), curves[i][l], kind='linear',axis=-1)
                 interpolated = interpollation_function(np.linspace(0, max_dur-1, num=number_interpolation_points))
                 latency = np.where(interpolated > threshold*np.max(interpolated))[1][0]
                 latency_interm.append(np.linspace(0, max_dur-1, num=number_interpolation_points)[latency])
             latency_all.append(latency_interm)
-        else:
-            latency_all.append(0)
     return(latency_all)
 
 def distance_from_fixation_point(low_grid,middle_grid,high_grid, start,end,pixel_by_pixel=False):

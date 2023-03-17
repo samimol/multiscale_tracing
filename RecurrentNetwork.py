@@ -11,7 +11,7 @@ import numpy as np
 
 class RecurrentNetwork():
 
-    def __init__(self, n_input_features,grid_size,big_pixels_size,bigger_pixels_size,device,feedforward_curve,feedforward_object,disinhibition):
+    def __init__(self, n_input_features,grid_size,big_pixels_size,bigger_pixels_size,device,feedforward_curve,feedforward_object):
         self.beta = 0.02
         self.n_input_features = n_input_features
         self.n_hidden_features = 1
@@ -29,13 +29,11 @@ class RecurrentNetwork():
         self.grid_size = grid_size
 
         self.device = device
-        
-        self.disinhibition = disinhibition
 
-        self.input_layer = InputLayer(self.n_input_features, self.n_hidden_features,self.disinhibition)
-        self.low_scale_layer = HiddenLayer(self.n_input_features, self.n_hidden_features, 6,self.big_pixels_size,grid_size,self.disinhibition,change_scale_fb=True)
-        self.middle_scale_layer = HiddenLayer(self.n_hidden_features, 6,self.high_feature,self.big_pixels_size,grid_size,self.disinhibition,change_scale_ff=True,higher_scale=True,change_scale_fb=True,upper_ymod=True)
-        self.high_scale_layer = HiddenLayer(self.high_feature,6,self.high_feature,self.bigger_pixels_size//self.big_pixels_size,grid_size,self.disinhibition,upper_ymod = False,change_scale_ff=True)
+        self.input_layer = InputLayer(self.n_input_features, self.n_hidden_features)
+        self.low_scale_layer = HiddenLayer(self.n_input_features, self.n_hidden_features, 6,self.big_pixels_size,grid_size,change_scale_fb=True)
+        self.middle_scale_layer = HiddenLayer(self.n_hidden_features, 6,self.high_feature,self.big_pixels_size,grid_size,change_scale_ff=True,higher_scale=True,change_scale_fb=True,upper_ymod=True)
+        self.high_scale_layer = HiddenLayer(self.high_feature,6,self.high_feature,self.bigger_pixels_size//self.big_pixels_size,grid_size,upper_ymod = False,change_scale_ff=True)
 
         self.output_layer = OutputLayer(self.n_hidden_features, self.n_input_features, 1,self.grid_size,self.big_pixels_size,self.bigger_pixels_size)
         
@@ -195,144 +193,95 @@ class RecurrentNetwork():
                 return i
 
     def accessory(self):
-            
-            if self.disinhibition:
-                init = torch.autograd.grad(self.Z[self.action], [self.Y3mod,self.VIP3,self.SOM3,
-                                                                 self.Y2mod,self.VIP2,self.SOM2,
-                                                                 self.Xmod,self.VIP0,self.SOM0,
-                                                                 self.Y6mod,self.VIP6,self.SOM6,
-                                                                 ], retain_graph=True, allow_unused=True)
-        
-        
-                Zy3mod = init[0]
-                Zvip3 = init[1]
-                Zsom3 = init[2]
-        
-                Zy2mod = init[3]
-                Zvip2 = init[4]
-                Zsom2 = init[5]
-        
-                Zxmod = init[6]
-                Zvip0 = init[7]
-                Zsom0 = init[8]
-        
-                Zy6mod = init[9]
-                Zvip6 = init[10]
-                Zsom6 = init[11]
-                for i in range(7):
-                    Zvip6 = torch.autograd.grad(self.SOM6, self.VIP6, grad_outputs=Zsom6, retain_graph=True, allow_unused=True)[0]
-                    Zvip6 = Zvip6 + init[10]
-        
-                    Zsom6 = torch.autograd.grad(self.Y6mod, self.SOM6, grad_outputs=Zy6mod, retain_graph=True, allow_unused=True)[0]
-                    Zsom6 = Zsom6 + init[11]
-        
-                    Zy6mod = torch.autograd.grad(self.VIP62, self.Y6mod3, grad_outputs=Zvip6, retain_graph=True, allow_unused=True)[0]
-                    Zy6mod = Zy6mod + torch.autograd.grad(self.VIP32, self.Y6mod3, grad_outputs=Zvip3, retain_graph=True, allow_unused=True)[0]
-                    Zy6mod = Zy6mod + init[9]
-        
-        
-                    Zvip3 = torch.autograd.grad(self.SOM3, self.VIP3, grad_outputs=Zsom3, retain_graph=True, allow_unused=True)[0]
-                    Zvip3 = Zvip3 + init[1]
-        
-                    Zsom3 = torch.autograd.grad(self.Y3mod, self.SOM3, grad_outputs=Zy3mod, retain_graph=True, allow_unused=True)[0]
-                    Zsom3 = Zsom3 + init[2]
-        
-                    Zy3mod = torch.autograd.grad(self.VIP32, self.Y3mod3, grad_outputs=Zvip3, retain_graph=True, allow_unused=True)[0]
-                    Zy3mod = Zy3mod + torch.autograd.grad(self.VIP22, self.Y3mod3, grad_outputs=Zvip2, retain_graph=True, allow_unused=True)[0]
-                    Zy3mod = Zy3mod + torch.autograd.grad(self.Y6mod, self.Y3mod, grad_outputs=Zy6mod, retain_graph=True, allow_unused=True)[0]
-                    Zy3mod = Zy3mod + init[0]
-        
-                    Zvip2 = torch.autograd.grad(self.SOM2, self.VIP2, grad_outputs=Zsom2, retain_graph=True, allow_unused=True)[0]
-                    Zvip2 = Zvip2 + init[4]
-        
-                    Zsom2 = torch.autograd.grad(self.Y2mod, self.SOM2, grad_outputs=Zy2mod, retain_graph=True, allow_unused=True)[0]
-                    #Zsom2 = Zsom2 + torch.autograd.grad(self.VIP22, self.SOM23, grad_outputs=Zvip2, retain_graph=True, allow_unused=True)[0]
-                    Zsom2 = Zsom2 + init[5]
-        
-                    Zy2mod = torch.autograd.grad(self.VIP22, self.Y2mod3, grad_outputs=Zvip2, retain_graph=True, allow_unused=True)[0]
-                    Zy2mod = Zy2mod + torch.autograd.grad(self.VIP02, self.Y2mod3, grad_outputs=Zvip0, retain_graph=True, allow_unused=True)[0]
-                    Zy2mod = Zy2mod + torch.autograd.grad(self.Y3mod, self.Y2mod, grad_outputs=Zy3mod, retain_graph=True, allow_unused=True)[0]
-                    Zy2mod = Zy2mod + init[3]
-        
-                    Zvip0 = torch.autograd.grad(self.SOM0, self.VIP0, grad_outputs=Zsom0, retain_graph=True, allow_unused=True)[0]
-                    Zvip0 = Zvip0 + init[7]
-        
-                    Zsom0 = torch.autograd.grad(self.Xmod, self.SOM0, grad_outputs=Zxmod, retain_graph=True, allow_unused=True)[0]
-                    Zsom0 = Zsom0 + init[8]
-        
-                    Zxmod = torch.autograd.grad(self.Y2mod, self.Xmod, grad_outputs=Zy2mod, retain_graph=True, allow_unused=True)[0]
-                    Zxmod = Zxmod + init[6]
-                return (Zy6mod,Zvip6,Zsom6,
-                        Zy3mod,Zvip3,Zsom3,
-                            Zy2mod,Zvip2,Zsom2,
-                            Zxmod,Zvip0,Zsom0)
-            else:
-                init = torch.autograd.grad(self.Z[self.action], [self.Y3mod,
-                                                                 self.Y2mod,
-                                                                 self.Xmod,
-                                                                 self.Y6mod
-                                                                 ], retain_graph=True, allow_unused=True)
-        
-        
-                Zy3mod = init[0]
-        
-                Zy2mod = init[1]
 
-                Zxmod = init[2]
-        
-                Zy6mod = init[3]
+        init = torch.autograd.grad(self.Z[self.action], [self.Y3mod,self.VIP3,self.SOM3,
+                                                         self.Y2mod,self.VIP2,self.SOM2,
+                                                         self.Xmod,self.VIP0,self.SOM0,
+                                                         self.Y6mod,self.VIP6,self.SOM6,
+                                                         ], retain_graph=True, allow_unused=True)
 
-                for i in range(7):
-                    Zy6mod = torch.autograd.grad(self.Y6mod2, self.Y6mod3, grad_outputs=Zy6mod, retain_graph=True, allow_unused=True)[0]
-                    Zy6mod = Zy6mod + torch.autograd.grad(self.Y3mod2, self.Y6mod3, grad_outputs=Zy3mod, retain_graph=True, allow_unused=True)[0]
-                    Zy6mod = Zy6mod + init[3]
-        
-        
-                    Zy3mod = torch.autograd.grad(self.Y3mod2, self.Y3mod3, grad_outputs=Zy3mod, retain_graph=True, allow_unused=True)[0]
-                    Zy3mod = Zy3mod + torch.autograd.grad(self.Y2mod2, self.Y3mod3, grad_outputs=Zy2mod, retain_graph=True, allow_unused=True)[0]
-                    Zy3mod = Zy3mod + torch.autograd.grad(self.Y6mod, self.Y3mod, grad_outputs=Zy6mod, retain_graph=True, allow_unused=True)[0]
-                    Zy3mod = Zy3mod + init[0]
-        
-                    Zy2mod = torch.autograd.grad(self.Y2mod2, self.Y2mod3, grad_outputs=Zy2mod, retain_graph=True, allow_unused=True)[0]
-                    Zy2mod = Zy2mod + torch.autograd.grad(self.Xmod2, self.Y2mod3, grad_outputs=Zxmod, retain_graph=True, allow_unused=True)[0]
-                    Zy2mod = Zy2mod + torch.autograd.grad(self.Y3mod, self.Y2mod, grad_outputs=Zy3mod, retain_graph=True, allow_unused=True)[0]
-                    Zy2mod = Zy2mod + init[1]
-        
-                    Zxmod = torch.autograd.grad(self.Y2mod, self.Xmod, grad_outputs=Zy2mod, retain_graph=True, allow_unused=True)[0]
-                    Zxmod = Zxmod + init[2]
-        
-                return (Zy6mod,
-                        Zy3mod,
-                        Zy2mod,
-                        Zxmod)
+
+        Zy3mod = init[0]
+        Zvip3 = init[1]
+        Zsom3 = init[2]
+
+        Zy2mod = init[3]
+        Zvip2 = init[4]
+        Zsom2 = init[5]
+
+        Zxmod = init[6]
+        Zvip0 = init[7]
+        Zsom0 = init[8]
+
+        Zy6mod = init[9]
+        Zvip6 = init[10]
+        Zsom6 = init[11]
+
+        for i in range(7):
+
+            Zvip6 = torch.autograd.grad(self.SOM6, self.VIP6, grad_outputs=Zsom6, retain_graph=True, allow_unused=True)[0]
+            Zvip6 = Zvip6 + init[10]
+
+            Zsom6 = torch.autograd.grad(self.Y6mod, self.SOM6, grad_outputs=Zy6mod, retain_graph=True, allow_unused=True)[0]
+            Zsom6 = Zsom6 + init[11]
+
+            Zy6mod = torch.autograd.grad(self.VIP62, self.Y6mod3, grad_outputs=Zvip6, retain_graph=True, allow_unused=True)[0]
+            Zy6mod = Zy6mod + torch.autograd.grad(self.VIP32, self.Y6mod3, grad_outputs=Zvip3, retain_graph=True, allow_unused=True)[0]
+            Zy6mod = Zy6mod + init[9]
+
+
+            Zvip3 = torch.autograd.grad(self.SOM3, self.VIP3, grad_outputs=Zsom3, retain_graph=True, allow_unused=True)[0]
+            Zvip3 = Zvip3 + init[1]
+
+            Zsom3 = torch.autograd.grad(self.Y3mod, self.SOM3, grad_outputs=Zy3mod, retain_graph=True, allow_unused=True)[0]
+            Zsom3 = Zsom3 + init[2]
+
+            Zy3mod = torch.autograd.grad(self.VIP32, self.Y3mod3, grad_outputs=Zvip3, retain_graph=True, allow_unused=True)[0]
+            Zy3mod = Zy3mod + torch.autograd.grad(self.VIP22, self.Y3mod3, grad_outputs=Zvip2, retain_graph=True, allow_unused=True)[0]
+            Zy3mod = Zy3mod + torch.autograd.grad(self.Y6mod, self.Y3mod, grad_outputs=Zy6mod, retain_graph=True, allow_unused=True)[0]
+            Zy3mod = Zy3mod + init[0]
+
+            Zvip2 = torch.autograd.grad(self.SOM2, self.VIP2, grad_outputs=Zsom2, retain_graph=True, allow_unused=True)[0]
+            Zvip2 = Zvip2 + init[4]
+
+            Zsom2 = torch.autograd.grad(self.Y2mod, self.SOM2, grad_outputs=Zy2mod, retain_graph=True, allow_unused=True)[0]
+            #Zsom2 = Zsom2 + torch.autograd.grad(self.VIP22, self.SOM23, grad_outputs=Zvip2, retain_graph=True, allow_unused=True)[0]
+            Zsom2 = Zsom2 + init[5]
+
+            Zy2mod = torch.autograd.grad(self.VIP22, self.Y2mod3, grad_outputs=Zvip2, retain_graph=True, allow_unused=True)[0]
+            Zy2mod = Zy2mod + torch.autograd.grad(self.VIP02, self.Y2mod3, grad_outputs=Zvip0, retain_graph=True, allow_unused=True)[0]
+            Zy2mod = Zy2mod + torch.autograd.grad(self.Y3mod, self.Y2mod, grad_outputs=Zy3mod, retain_graph=True, allow_unused=True)[0]
+            Zy2mod = Zy2mod + init[3]
+
+            Zvip0 = torch.autograd.grad(self.SOM0, self.VIP0, grad_outputs=Zsom0, retain_graph=True, allow_unused=True)[0]
+            Zvip0 = Zvip0 + init[7]
+
+            Zsom0 = torch.autograd.grad(self.Xmod, self.SOM0, grad_outputs=Zxmod, retain_graph=True, allow_unused=True)[0]
+            Zsom0 = Zsom0 + init[8]
+
+            Zxmod = torch.autograd.grad(self.Y2mod, self.Xmod, grad_outputs=Zy2mod, retain_graph=True, allow_unused=True)[0]
+            Zxmod = Zxmod + init[6]
+
+        return (Zy6mod,Zvip6,Zsom6,
+            Zy3mod,Zvip3,Zsom3,
+                Zy2mod,Zvip2,Zsom2,
+                Zxmod,Zvip0,Zsom0)
 
     def do_learn(self, reward):
         with torch.no_grad():
             exp_value = self.Z[self.action]
             self.delta = reward - exp_value
-            
-        if self.disinhibition:
-            (Zy6mod,Zvip6,Zsom6,
-             Zy3mod,Zvip3,Zsom3,
-             Zy2mod,Zvip2,Zsom2,
-             Zxmod,Zvip0,Zsom0) = self.accessory()
-    
-            self.input_layer.update_layer([self.Xmod,self.SOM0,self.VIP0], [Zxmod,Zsom0,Zvip0], self.beta, self.delta)
-            self.low_scale_layer.update_layer([self.Y2,self.Y2mod,self.SOM2,self.VIP2], [None,Zy2mod,Zsom2,Zvip2], self.beta, self.delta,train_v=False)
-            self.middle_scale_layer.update_layer([self.Y3,self.Y3mod,self.SOM3,self.VIP3], [None,Zy3mod,Zsom3,Zvip3], self.beta, self.delta,train_v=False)
-            self.high_scale_layer.update_layer([self.Y6,self.Y6mod,self.SOM6,self.VIP6], [None,Zy6mod,Zsom6,Zvip6], self.beta, self.delta)
-            self.output_layer.update_layer(self.Z[self.action], self.beta, self.delta)
-        else:
-            (Zy6mod,
-             Zy3mod,
-             Zy2mod,
-             Zxmod) = self.accessory()
-    
-            self.input_layer.update_layer([self.Xmod,self.Xmod,self.Xmod], [Zxmod,Zxmod,Zxmod], self.beta, self.delta)
-            self.low_scale_layer.update_layer([self.Y2,self.Y2mod,self.Y2mod,self.Y2mod], [None,Zy2mod,Zy2mod,Zy2mod], self.beta, self.delta,train_v=False)
-            self.middle_scale_layer.update_layer([self.Y3,self.Y3mod,self.Y3mod,self.Y3mod], [None,Zy3mod,Zy3mod,Zy3mod], self.beta, self.delta,train_v=False)
-            self.high_scale_layer.update_layer([self.Y6,self.Y6mod,self.Y6mod,self.Y6mod], [None,Zy6mod,Zy6mod,Zy6mod], self.beta, self.delta)
-            self.output_layer.update_layer(self.Z[self.action], self.beta, self.delta)
+
+        (Zy6mod,Zvip6,Zsom6,
+         Zy3mod,Zvip3,Zsom3,
+         Zy2mod,Zvip2,Zsom2,
+         Zxmod,Zvip0,Zsom0) = self.accessory()
+
+        self.input_layer.update_layer([self.Xmod,self.SOM0,self.VIP0], [Zxmod,Zsom0,Zvip0], self.beta, self.delta)
+        self.low_scale_layer.update_layer([self.Y2,self.Y2mod,self.SOM2,self.VIP2], [None,Zy2mod,Zsom2,Zvip2], self.beta, self.delta,train_v=False)
+        self.middle_scale_layer.update_layer([self.Y3,self.Y3mod,self.SOM3,self.VIP3], [None,Zy3mod,Zsom3,Zvip3], self.beta, self.delta,train_v=False)
+        self.high_scale_layer.update_layer([self.Y6,self.Y6mod,self.SOM6,self.VIP6], [None,Zy6mod,Zsom6,Zvip6], self.beta, self.delta)
+        self.output_layer.update_layer(self.Z[self.action], self.beta, self.delta)
 
     def detach_and_reattach(self, x):
         detached = [xx.detach() for xx in x]
