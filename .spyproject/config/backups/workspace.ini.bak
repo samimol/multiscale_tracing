@@ -4,7 +4,7 @@ save_data_on_exit = True
 save_history = True
 save_non_project_files = False
 project_type = 'empty-project-type'
-recent_files = ['Task.py', 'RecurrentNetwork.py', 'Layers.py', 'FF_data.py']
+recent_files = ['Task.py', 'RecurrentNetwork.py', 'Layers.py', 'main.py', '..\\..\\ANNGrowthCone\\gammanet\\model\\main.py', '..\\..\\ANNGrowthCone\\object_tracing_data\\main.py', '..\\..\\ANNGrowthCone\\gammanet\\model\\utils\\py_utils.py']
 
 [main]
 version = 0.2.0
