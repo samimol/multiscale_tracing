@@ -330,8 +330,9 @@ class OutputLayer(CustomLayer):
     def update_layer(self, upper, beta, delta):
         self.input_to_output = self.update_weight(self.input_to_output, upper, beta, delta, average=False)
         self.low_to_output = self.update_weight(self.low_to_output, upper, beta, delta,self.low_to_output_mask, receptive_field_size = 1)
-        self.middle_to_output = self.update_weight(self.middle_to_output, upper, beta, delta,self.middle_to_output_mask, receptive_field_size=self.big_pixels_size)
-        self.high_to_output = self.update_weight(self.high_to_output, upper, beta, delta, self.high_to_output_mask,receptive_field_size = self.bigger_pixels_size)
+        if not self.one_scale:
+            self.middle_to_output = self.update_weight(self.middle_to_output, upper, beta, delta,self.middle_to_output_mask, receptive_field_size=self.big_pixels_size)
+            self.high_to_output = self.update_weight(self.high_to_output, upper, beta, delta, self.high_to_output_mask,receptive_field_size = self.bigger_pixels_size)
 
 class FFLayer(CustomLayer):
 

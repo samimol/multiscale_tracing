@@ -32,6 +32,7 @@ seed = int(batch_id) + datetime.datetime.now().microsecond
 torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
+one_scale = args.one_scale
     
 def make_data_feedforward(device):
 
@@ -58,11 +59,11 @@ def train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,in
     feedforward_curve.train(optimizer,criterion,torch.cat((input_3_curve.to(device),input_9_curve.to(device)),dim=0),[torch.cat((labels_3_curve.to(device),labels_9_other_curve.to(device)),dim=0),torch.cat((labels_3_other_curve.to(device),labels_9_curve.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
     return(feedforward_curve)
 
-def train_full_network(feedforward_curve,feedforward_object,device):
+def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
     grid_size = 36
     big_pixels_size = 3
     bigger_pixels_size = 9
-    n = RecurrentNetwork(3,grid_size,big_pixels_size,bigger_pixels_size,device,feedforward_curve,feedforward_object)
+    n = RecurrentNetwork(3,grid_size,big_pixels_size,bigger_pixels_size,device,feedforward_curve,feedforward_object,one_scale)
 
     n.duration = 30
     n.save_activities = False
@@ -120,7 +121,7 @@ if __name__ == '__main__':
     input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve = make_data_feedforward(seed,device)
     feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device)
     feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device)
-    n,trial_corrects = train_full_network(feedforward_curve,feedforward_blob,device)
+    n,trial_corrects = train_full_network(feedforward_curve,feedforward_blob,one_scale,device)
     
     filename = results_folder + 'n_' + batch_id
     torch.save(n, filename)
