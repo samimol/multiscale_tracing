@@ -15,6 +15,7 @@ from FF_data import *
 from FeedforwardNetwork import *
 from helper_functions import *
 from opts import parser
+import torch.optim as optim
 
 if os.name == 'nt':
    batch_id = 0
@@ -72,7 +73,7 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
     min_length = 3
     
     t=TraceCurves(3,device,3,9)
-    t.only_blue = True
+    t.only_blue = False
     t.grid_size = grid_size
     t.curve_length = 3
     
@@ -106,12 +107,14 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
             average = np.mean(corrects)
             average_all.append(average)
         if max_length < total_length:
-            if (i-tac) > 2000 and average >= 0.85:
-              if t.only_blue:
-                  t.only_blue = False
-              else:
-                  max_length += 1
+            if (i-tac) > 500 and t.only_blue:
+              (n,corrects,target_history,distr_history,display) = test_network(TraceCurves(3,device,3,9),max_length,grid_size,500,n,device,False,t.only_blue)
               tac = i
+              if np.mean(corrects) > 0.85:
+                t.only_blue = False   
+            if (i-tac) > 2000 and average >= 0.85:
+              tac = i
+              max_length += 1
         elif max_length == total_length and (i-tac) > 2000 and average >= 0.85:
               break   
 
