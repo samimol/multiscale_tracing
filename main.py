@@ -78,7 +78,7 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
     
     reward = 0
     trialEnd = False
-    trials = 50000
+    trials = 55000
     average = 0
     trial_corrects = []
     average_all = []
@@ -109,7 +109,8 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
             if (i-tac) > 2000 and average >= 0.85:
               if t.only_blue:
                   t.only_blue = False
-              max_length += 1
+              else:
+                  max_length += 1
               tac = i
         elif max_length == total_length and (i-tac) > 2000 and average >= 0.85:
               break   
