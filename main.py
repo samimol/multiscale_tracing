@@ -14,19 +14,25 @@ import datetime
 from FF_data import *
 from FeedforwardNetwork import *
 from helper_functions import *
-
+from opts import parser
 
 if os.name == 'nt':
    batch_id = 0
 else:
     batch_id = os.environ["SLURM_PROCID"]
+    
+args = parser.parse_args()
 
-def make_data_feedforward(seed):
+if args.num_machine > 1:
+    device = None
+else:
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def make_data_feedforward(seed,device):
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
-    device = None
-    
+
     (input_3_blob,labels_3_blob,labels_3_other_blob) = make_dataset_blob(72,3,9,10000,device)
     (input_9_blob,labels_9_blob,labels_9_other_blob) = make_dataset_blob(72,9,3,10000,device)
 
@@ -34,8 +40,7 @@ def make_data_feedforward(seed):
     (input_9_curve,labels_9_curve,labels_9_other_curve) = make_dataset_curve(18,9,3,50000,device)
     return(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve)
 
-def train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob):
-    device = None
+def train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device):
     feedforward_blob = FeedforwardNetwork(device)
     feedforward_blob = feedforward_blob.to(device)
     criterion = [nn.BCELoss(),nn.BCELoss()]
@@ -43,8 +48,7 @@ def train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_
     feedforward_blob.train(optimizer,criterion,torch.cat((input_3_blob.to(device),input_9_blob.to(device)),dim=0),[torch.cat((labels_3_blob.to(device),labels_9_other_blob.to(device)),dim=0),torch.cat((labels_3_other_blob.to(device),labels_9_blob.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
     return(feedforward_blob)
 
-def train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve):
-    device = None
+def train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device):
     feedforward_curve = FeedforwardNetwork(device)
     feedforward_curve = feedforward_blob.to(device)
     criterion = [nn.BCELoss(),nn.BCELoss()]
@@ -52,8 +56,7 @@ def train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,in
     feedforward_curve.train(optimizer,criterion,torch.cat((input_3_curve.to(device),input_9_curve.to(device)),dim=0),[torch.cat((labels_3_curve.to(device),labels_9_other_curve.to(device)),dim=0),torch.cat((labels_3_other_curve.to(device),labels_9_curve.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
     return(feedforward_curve)
 
-def train_full_network(feedforward_curve,feedforward_object):
-    device = None
+def train_full_network(feedforward_curve,feedforward_object,device):
     grid_size = 36
     big_pixels_size = 3
     bigger_pixels_size = 9
@@ -115,10 +118,10 @@ if __name__ == '__main__':
         os.mkdir(results_folder)
     
     seed = batch_id+datetime.datetime.now().microsecond
-    input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve = make_data_feedforward(seed)
-    feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob)
-    feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve)
-    n,trial_corrects = train_full_network(feedforward_curve,feedforward_blob)
+    input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve = make_data_feedforward(seed,device)
+    feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device)
+    feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device)
+    n,trial_corrects = train_full_network(feedforward_curve,feedforward_blob,device)
     
     filename = results_folder + 'n_' + batch_id
     torch.save(n, filename)
