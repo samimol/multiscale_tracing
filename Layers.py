@@ -250,7 +250,7 @@ class HiddenLayer(CustomLayer):
 
 class OutputLayer(CustomLayer):
 
-    def __init__(self, hidden_features, input_features, feature_out,grid_size,big_pixels_size,bigger_pixels_size):
+    def __init__(self, hidden_features, input_features, feature_out,grid_size,big_pixels_size,bigger_pixels_size,one_scale):
         super().__init__()
         self.grid_size = grid_size
         K_size = 2 * self.grid_size - 1
@@ -260,6 +260,7 @@ class OutputLayer(CustomLayer):
         self.bigger_pixels_size = bigger_pixels_size
         self.hidden_features = hidden_features
         self.feature_out = feature_out
+        self.one_scale = one_scale
         
         self.high_to_output = nn.ConvTranspose2d(6, 1,2 * self.grid_size - 1, stride=self.bigger_pixels_size, padding=int(0.5*(2 * self.grid_size - 1 - self.bigger_pixels_size)),bias=False)#nn.ConvTranspose2d(6, feature_out, 3, stride=3, padding=0,bias=False)
         self.low_to_output = nn.Conv2d(hidden_features, feature_out, K_size, stride=1, padding='same',bias=False)
@@ -283,7 +284,9 @@ class OutputLayer(CustomLayer):
 
 
     def forward(self, inputmod,low_scale,middle_scale,high_scale):
-        Y =  self.input_to_output(inputmod) + self.low_to_output(low_scale) + self.middle_to_output(middle_scale) + self.high_to_output(high_scale)
+        Y =  self.input_to_output(inputmod) + self.low_to_output(low_scale) 
+        if not self.one_scale:
+            Y = Y + self.middle_to_output(middle_scale) + self.high_to_output(high_scale)
         return(Y)
 
     def rescale(self,new_grid_size,device):

@@ -28,10 +28,12 @@ if args.num_machines > 1:
 else:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def make_data_feedforward(seed,device):
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+seed = int(batch_id) + datetime.datetime.now().microsecond
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
+    
+def make_data_feedforward(device):
 
     (input_3_blob,labels_3_blob,labels_3_other_blob) = make_dataset_blob(72,3,9,10000,device)
     (input_9_blob,labels_9_blob,labels_9_other_blob) = make_dataset_blob(72,9,3,10000,device)
@@ -114,8 +116,7 @@ def train_full_network(feedforward_curve,feedforward_object,device):
 if __name__ == '__main__':
     
     results_folder = os.path.join('multiscale','results')
-    
-    seed = int(batch_id) + datetime.datetime.now().microsecond
+
     input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve = make_data_feedforward(seed,device)
     feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device)
     feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device)
