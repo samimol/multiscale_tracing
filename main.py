@@ -72,6 +72,7 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
     min_length = 3
     
     t=TraceCurves(3,device,3,9)
+    t.only_blue = True
     t.grid_size = grid_size
     t.curve_length = 3
     
@@ -101,11 +102,13 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
                 else:
                     trial_corrects.append(0)
         if (i-tac)%2000 == 0 and i > 0:
-            (n,corrects,target_history,distr_history,display) = test_network(TraceCurves(3,device,3,9),max_length,grid_size,500,n,device,False)
+            (n,corrects,target_history,distr_history,display) = test_network(TraceCurves(3,device,3,9),max_length,grid_size,500,n,device,False,t.only_blue)
             average = np.mean(corrects)
             average_all.append(average)
         if max_length < total_length:
             if (i-tac) > 2000 and average >= 0.85:
+              if t.only_blue:
+                  t.only_blue = False
               max_length += 1
               tac = i
         elif max_length == total_length and (i-tac) > 2000 and average >= 0.85:
@@ -118,7 +121,7 @@ if __name__ == '__main__':
     
     results_folder = os.path.join('multiscale','results')
 
-    input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve = make_data_feedforward(seed,device)
+    input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve = make_data_feedforward(device)
     feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device)
     feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device)
     n,trial_corrects = train_full_network(feedforward_curve,feedforward_blob,one_scale,device)

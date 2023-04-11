@@ -162,7 +162,7 @@ def make_blob(grid_size):
     return x_blob,y_blob
 
 
-def test_network(t,CurveLength,grid_size,TrialNumber,n,device,save_activities,verbose=True):
+def test_network(t,CurveLength,grid_size,TrialNumber,n,device,save_activities,only_blue,verbose=True):
     prev_exploitation_probability = n.exploitation_probability
     n.exploitation_probability = 1
     n.save_activities = save_activities
@@ -172,6 +172,7 @@ def test_network(t,CurveLength,grid_size,TrialNumber,n,device,save_activities,ve
     display = []
     t.curve_length = CurveLength
     t.grid_size = grid_size
+    t.only_blue = only_blue
     action = 0
     n.save_activities = save_activities
     if save_activities:
