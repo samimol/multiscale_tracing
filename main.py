@@ -13,6 +13,8 @@ import os
 import datetime
 from FF_data import *
 from FeedforwardNetwork import *
+from RecurrentNetwork import *
+from Task import *
 from helper_functions import *
 from opts import parser
 import torch.optim as optim
@@ -24,8 +26,8 @@ else:
     
 args = parser.parse_args()
 
-if args.num_machines > 1:
-    device = None
+if args.num_networks > 1:
+    device = torch.device('cpu')
 else:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -33,32 +35,7 @@ seed = int(batch_id) + datetime.datetime.now().microsecond
 torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
-one_scale = args.one_scale
     
-def make_data_feedforward(device):
-
-    (input_3_blob,labels_3_blob,labels_3_other_blob) = make_dataset_blob(72,3,9,10000,device)
-    (input_9_blob,labels_9_blob,labels_9_other_blob) = make_dataset_blob(72,9,3,10000,device)
-
-    (input_3_curve,labels_3_curve,labels_3_other_curve) = make_dataset_curve(18,3,9,50000,device)
-    (input_9_curve,labels_9_curve,labels_9_other_curve) = make_dataset_curve(18,9,3,50000,device)
-    return(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve)
-
-def train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device):
-    feedforward_blob = FeedforwardNetwork(device)
-    feedforward_blob = feedforward_blob.to(device)
-    criterion = [nn.BCELoss(),nn.BCELoss()]
-    optimizer = optim.Adam(feedforward_blob.parameters(), lr=0.001)
-    feedforward_blob.train(optimizer,criterion,torch.cat((input_3_blob.to(device),input_9_blob.to(device)),dim=0),[torch.cat((labels_3_blob.to(device),labels_9_other_blob.to(device)),dim=0),torch.cat((labels_3_other_blob.to(device),labels_9_blob.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
-    return(feedforward_blob)
-
-def train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device):
-    feedforward_curve = FeedforwardNetwork(device)
-    feedforward_curve = feedforward_blob.to(device)
-    criterion = [nn.BCELoss(),nn.BCELoss()]
-    optimizer = optim.Adam(feedforward_blob.parameters(), lr=0.001)
-    feedforward_curve.train(optimizer,criterion,torch.cat((input_3_curve.to(device),input_9_curve.to(device)),dim=0),[torch.cat((labels_3_curve.to(device),labels_9_other_curve.to(device)),dim=0),torch.cat((labels_3_other_curve.to(device),labels_9_curve.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
-    return(feedforward_curve)
 
 def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
     grid_size = 36
@@ -123,18 +100,38 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
 
 if __name__ == '__main__':
     
-    results_folder = os.path.join('multiscale','results')
-
-    input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve = make_data_feedforward(device)
-    feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device)
-    feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device)
-    n,trial_corrects = train_full_network(feedforward_curve,feedforward_blob,one_scale,device)
+    results_folder = os.path.join('multiscale','results','recurrent_networks')
+    if args.full_training:
+        assert device.type == 'cuda', 'full training should be done on gpu'
+        (input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve) = make_data_feedforward(device)
+        feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device)
+        feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device)
+        n,trial_corrects = train_full_network(feedforward_curve,feedforward_blob,args.one_scale,device)
+        
+        filename = os.path.join(results_folder, 'n_' + batch_id + '.pt')
+        torch.save(n, filename)
+        
+        filename = os.path.join(results_folder, 'performance_' + batch_id + '.pt')
+        np.save(filename,np.array(trial_corrects))
+    else:    
+        feedfoward_folder = os.path.join('multiscale','results','feedforward_networks')
     
-    filename = results_folder + 'n_' + batch_id
-    torch.save(n, filename)
-    
-    filename = results_folder + 'performance_' + batch_id
-    np.save(filename,np.array(trial_corrects))
+        if device.type == 'cuda':
+          feedforward_curve = torch.load(os.path.join(feedfoward_folder,'FF_curve_' + batch_id + '.pt'))
+        else:
+            feedforward_curve = torch.load(os.path.join(feedfoward_folder,'FF_curve_' + batch_id + '.pt'), map_location=torch.device('cpu'))
+        if device.type == 'cuda':
+          feedforward_object = torch.load(os.path.join(feedfoward_folder,'FF_blob_' + batch_id + '.pt'))
+        else:
+          feedforward_object = torch.load(os.path.join(feedfoward_folder,'FF_blob_' + batch_id + '.pt'), map_location=torch.device('cpu'))
+            
+        n,trial_corrects = train_full_network(feedforward_curve,feedforward_object,args.one_scale,device)
+        
+        filename = os.path.join(results_folder, 'n_' + batch_id + '.pt')
+        torch.save(n, filename)
+        
+        filename = os.path.join(results_folder, 'performance_' + batch_id + '.pt')
+        np.save(filename,np.array(trial_corrects))
     
     
     

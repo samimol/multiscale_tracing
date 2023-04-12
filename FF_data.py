@@ -136,3 +136,13 @@ def make_dataset_blob(grid_size,big_pixel_size,other_big_pixel_size,num_trial,de
           labels[k,:,:,:] = label
           labels_other[k,:,:,:] = label_other
     return(input_list,labels,labels_other)
+
+
+def make_data_feedforward(device):
+
+    (input_3_blob,labels_3_blob,labels_3_other_blob) = make_dataset_blob(72,3,9,10000,device)
+    (input_9_blob,labels_9_blob,labels_9_other_blob) = make_dataset_blob(72,9,3,10000,device)
+
+    (input_3_curve,labels_3_curve,labels_3_other_curve) = make_dataset_curve(18,3,9,50000,device)
+    (input_9_curve,labels_9_curve,labels_9_other_curve) = make_dataset_curve(18,9,3,50000,device)
+    return(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve)

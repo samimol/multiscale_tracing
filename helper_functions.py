@@ -324,3 +324,4 @@ def distance_from_fixation_point(low_grid,middle_grid,high_grid, start,end,pixel
                         distance_grid[x2,y2] = last_distance + 1
                         queue.append([x2,y2])
     return(distance_grid)
+

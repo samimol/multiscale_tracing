@@ -8,5 +8,6 @@ Created on Tue Apr 11 10:30:58 2023
 import argparse
 parser = argparse.ArgumentParser(description="multiscale network")
 
-parser.add_argument('--num_machines', type=int, default=23)
+parser.add_argument('--num_networks', type=int, default=10)
 parser.add_argument('--one_scale', action='store_true')
+parser.add_argument('--full_training', action='store_true')

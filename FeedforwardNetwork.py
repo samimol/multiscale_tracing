@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import random
+import torch.optim as optim
 
 class FeedforwardNetwork(nn.Module): 
     def __init__(self,device):
@@ -76,3 +77,20 @@ class FeedforwardNetwork(nn.Module):
                     if count % print_frequency == print_frequency - 1:    # print every 2000 mini-batches
                         print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.15f}')
                         running_loss = 0.0
+
+
+def train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device):
+    feedforward_blob = FeedforwardNetwork(device)
+    feedforward_blob = feedforward_blob.to(device)
+    criterion = [nn.BCELoss(),nn.BCELoss()]
+    optimizer = optim.Adam(feedforward_blob.parameters(), lr=0.001)
+    feedforward_blob.train(optimizer,criterion,torch.cat((input_3_blob.to(device),input_9_blob.to(device)),dim=0),[torch.cat((labels_3_blob.to(device),labels_9_other_blob.to(device)),dim=0),torch.cat((labels_3_other_blob.to(device),labels_9_blob.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
+    return(feedforward_blob)
+
+def train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device):
+    feedforward_curve = FeedforwardNetwork(device)
+    feedforward_curve = feedforward_curve.to(device)
+    criterion = [nn.BCELoss(),nn.BCELoss()]
+    optimizer = optim.Adam(feedforward_curve.parameters(), lr=0.001)
+    feedforward_curve.train(optimizer,criterion,torch.cat((input_3_curve.to(device),input_9_curve.to(device)),dim=0),[torch.cat((labels_3_curve.to(device),labels_9_other_curve.to(device)),dim=0),torch.cat((labels_3_other_curve.to(device),labels_9_curve.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
+    return(feedforward_curve)
