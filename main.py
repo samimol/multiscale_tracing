@@ -130,7 +130,7 @@ if __name__ == '__main__':
         filename = os.path.join(results_folder, 'n_' + batch_id + '.pt')
         torch.save(n, filename)
         
-        filename = os.path.join(results_folder, 'performance_' + batch_id + '.pt')
+        filename = os.path.join(results_folder, 'performance_' + batch_id)
         np.save(filename,np.array(trial_corrects))
     
     

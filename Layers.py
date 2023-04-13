@@ -45,12 +45,12 @@ class CustomLayer(nn.Module):
                   if not one_to_one:
                       lower_bound = int(0.5*(2*self.grid_size-1-receptive_field_size))
                       upper_bound = int(lower_bound + receptive_field_size)
-                      K[f, f2, lower_bound:upper_bound,lower_bound:upper_bound] = 0.001 * np.random.rand()
+                      K[f, f2, lower_bound:upper_bound,lower_bound:upper_bound] = 0.005 * np.random.rand()
                   else:
                     if self.layer_type != "output":
                         K[f,f2,0] =  self.initialisation_range * np.random.rand() + 1
                     else:
-                        K[f, f2, 0] = 0.001 * np.random.rand()
+                        K[f, f2, 0] = 0.005 * np.random.rand()
         if layer.bias is not None:
           for f in range(bias.shape[0]):  
                 bias[f] = 1
@@ -297,9 +297,9 @@ class OutputLayer(CustomLayer):
         high_to_output_weight = torch.zeros_like(high_to_output.weight)
         lower_bound = int(0.5*(2*new_grid_size-1-self.bigger_pixels_size))
         upper_bound = int(lower_bound + self.bigger_pixels_size)
-        test = torch.unique(self.high_to_output.weight[self.high_to_output.weight!=0])
-        test = test[None,None,None,:]
-        high_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = test.T
+        non_zero_weights = torch.unique(self.high_to_output.weight[self.high_to_output.weight!=0])
+        non_zero_weights = non_zero_weights[:,None,None,None]
+        high_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = non_zero_weights
         high_to_output.weight = torch.nn.Parameter(high_to_output_weight)
         self.high_to_output = high_to_output
         self.high_to_output.to(device)
@@ -307,9 +307,9 @@ class OutputLayer(CustomLayer):
         middle_to_output_weight = torch.zeros_like(middle_to_output.weight)
         lower_bound = int(0.5*(2*new_grid_size-1-self.big_pixels_size))
         upper_bound = int(lower_bound + self.big_pixels_size)
-        test = torch.unique(self.middle_to_output.weight[self.middle_to_output.weight!=0])
-        test = test[None,None,None,:]
-        middle_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = test.T
+        non_zero_weights = torch.unique(self.middle_to_output.weight[self.middle_to_output.weight!=0])
+        non_zero_weights = non_zero_weights[:,None,None,None]
+        middle_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = non_zero_weights
         middle_to_output.weight = torch.nn.Parameter(middle_to_output_weight)
         self.middle_to_output = middle_to_output
         self.middle_to_output.to(device)
@@ -317,9 +317,9 @@ class OutputLayer(CustomLayer):
         low_to_output_weight = torch.zeros_like(low_to_output.weight)
         lower_bound = int(0.5*(2*new_grid_size-1-1))
         upper_bound = int(lower_bound + 1)
-        test = torch.unique(self.low_to_output.weight[self.low_to_output.weight!=0])
-        test = test[None,None,None,:]
-        low_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = test.T
+        non_zero_weights = torch.unique(self.low_to_output.weight[self.low_to_output.weight!=0])
+        non_zero_weights = non_zero_weights[:,None,None,None]
+        low_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = non_zero_weights
         low_to_output.weight = torch.nn.Parameter(low_to_output_weight)
         self.low_to_output = low_to_output
         self.low_to_output.to(device)
