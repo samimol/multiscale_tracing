@@ -42,7 +42,6 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
     big_pixels_size = 3
     bigger_pixels_size = 9
     n = RecurrentNetwork(3,grid_size,big_pixels_size,bigger_pixels_size,device,feedforward_curve,feedforward_object,one_scale)
-
     n.duration = 30
     n.save_activities = False
 

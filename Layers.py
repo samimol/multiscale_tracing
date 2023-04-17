@@ -45,12 +45,12 @@ class CustomLayer(nn.Module):
                   if not one_to_one:
                       lower_bound = int(0.5*(2*self.grid_size-1-receptive_field_size))
                       upper_bound = int(lower_bound + receptive_field_size)
-                      K[f, f2, lower_bound:upper_bound,lower_bound:upper_bound] = 0.005 * np.random.rand()
+                      K[f, f2, lower_bound:upper_bound,lower_bound:upper_bound] = 0.001 * np.random.rand()
                   else:
                     if self.layer_type != "output":
                         K[f,f2,0] =  self.initialisation_range * np.random.rand() + 1
                     else:
-                        K[f, f2, 0] = 0.005 * np.random.rand()
+                        K[f, f2, 0] = 0.001 + 0.001 * np.random.rand()
         if layer.bias is not None:
           for f in range(bias.shape[0]):  
                 bias[f] = 1
