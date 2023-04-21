@@ -61,7 +61,9 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
     average_all = []
     action = 0
     tac = 0
-    total_length = 8
+    total_length = args.total_length
+    
+    generalization = np.zeros((total_length-2,total_length+1))
 
     for i in range(trials):
         trial_running = True
@@ -82,6 +84,9 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
             (n,corrects,target_history,distr_history,display) = test_network(TraceCurves(3,device,3,9),max_length,grid_size,500,n,device,False,t.only_blue)
             average = np.mean(corrects)
             average_all.append(average)
+            for k in range(max_length+1,max_length+5):
+              (n,corrects,target_history,distr_history,display) = test_network(TraceCurves(3,device,3,9),k,grid_size,500,n,device,False,t.only_blue)
+              generalization[max_length-3,k-4] = np.mean(corrects)
         if max_length < total_length:
             if (i-tac) > 500 and t.only_blue:
               (n,corrects,target_history,distr_history,display) = test_network(TraceCurves(3,device,3,9),max_length,grid_size,500,n,device,False,t.only_blue)
@@ -94,18 +99,21 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
         elif max_length == total_length and (i-tac) > 2000 and average >= 0.85:
               break   
 
-    return(n,trial_corrects)
+    return(n,trial_corrects,generalization)
 
 
 if __name__ == '__main__':
     
     results_folder = os.path.join('multiscale','results','recurrent_networks')
+    if args.one_scale:
+        results_folder = os.path.join(results_folder,'_one_scale')
+        
     if args.full_training:
         assert device.type == 'cuda', 'full training should be done on gpu'
         (input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve) = make_data_feedforward(device)
         feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device)
         feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device)
-        n,trial_corrects = train_full_network(feedforward_curve,feedforward_blob,args.one_scale,device)
+        n,trial_corrects,generalization = train_full_network(feedforward_curve,feedforward_blob,args.one_scale,device)
         
         filename = os.path.join(results_folder, 'n_' + batch_id + '.pt')
         torch.save(n, filename)
@@ -124,13 +132,16 @@ if __name__ == '__main__':
         else:
           feedforward_object = torch.load(os.path.join(feedfoward_folder,'FF_blob_' + batch_id + '.pt'), map_location=torch.device('cpu'))
             
-        n,trial_corrects = train_full_network(feedforward_curve,feedforward_object,args.one_scale,device)
+        n,trial_corrects,generalization = train_full_network(feedforward_curve,feedforward_object,args.one_scale,device)
         
         filename = os.path.join(results_folder, 'n_' + batch_id + '.pt')
         torch.save(n, filename)
         
         filename = os.path.join(results_folder, 'performance_' + batch_id)
         np.save(filename,np.array(trial_corrects))
+    
+        filename = os.path.join(results_folder, 'generalization_' + batch_id)
+        np.save(filename,np.array(generalization))
     
     
     
