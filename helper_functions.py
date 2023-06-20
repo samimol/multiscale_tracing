@@ -231,7 +231,7 @@ def get_extremity(data,pixels,grid_size):
         if neighbours == 1:
             return(x,y)
 
-def attention_dynamics(ar,CurveLength,grid_size,max_dur,corrects,object_1,object_2,cpu=False):
+def attention_dynamics(ar,CurveLength,grid_size,max_dur,corrects,object_1,object_2,to_cpu=False):
     # Get the dynamics of the spreading of attention for all the pixels of the objects if they are curve, only for the last one if they are object
     feat = 0  
     p = 1
@@ -241,7 +241,7 @@ def attention_dynamics(ar,CurveLength,grid_size,max_dur,corrects,object_1,object
         target_hist = object_1
         distr_hist = object_2
         for i in range(dur):
-            if cpu:
+            if to_cpu:
                 ar[p][i] = ar[p][i].cpu()
             if CurveLength > 1:
                 curves[0][i] = ar[p][i][0,feat,target_hist[0] % grid_size, target_hist[0] //grid_size] - ar[p][i][0,feat,distr_hist[0]%grid_size,distr_hist[0]//grid_size]
@@ -249,7 +249,7 @@ def attention_dynamics(ar,CurveLength,grid_size,max_dur,corrects,object_1,object
                     curves[l][i] = ar[p][i][0,feat,target_hist[l]%grid_size,target_hist[l]//grid_size] -  ar[p][i][0,feat,distr_hist[l]%grid_size,distr_hist[l]//grid_size]
             curves[CurveLength-1][i] = ar[p][i][0,feat,target_hist[-1]%grid_size,target_hist[-1]//grid_size] -  ar[p][i][0,feat,distr_hist[-1]%grid_size,distr_hist[-1]//grid_size]
             if dur < max_dur:
-                if cpu:
+                if to_cpu:
                     ar[p][-1] = ar[p][-1].cpu()
                 if CurveLength > 1:
                     curves[0][dur:] = ar[p][-1][0,feat,target_hist[0] % grid_size, target_hist[0] //grid_size] - ar[p][-1][0,feat,distr_hist[0]%grid_size,distr_hist[0]//grid_size]
@@ -273,11 +273,14 @@ def real_latency(curves,threshold,correct):
             for l in range(CurveLength):
                 interpollation_function = scipy.interpolate.interp1d(np.arange(0,max_dur), curves[i][l], kind='linear',axis=-1)
                 interpolated = interpollation_function(np.linspace(0, max_dur-1, num=number_interpolation_points))
-                latency = np.where(interpolated > threshold*np.max(interpolated))[1][0]
-                latency_interm.append(np.linspace(0, max_dur-1, num=number_interpolation_points)[latency])
+                try:
+                    latency = np.where(interpolated > threshold*np.max(interpolated))[1][0]
+                    latency_interm.append(np.linspace(0, max_dur-1, num=number_interpolation_points)[latency])
+                except:
+                    latency_interm.append(0)
             latency_all.append(latency_interm)
         else:
-            latency_all.append(0)
+            latency_all.append([0])
     return(latency_all)
 
 def distance_from_fixation_point(low_grid,middle_grid,high_grid, start,end,pixel_by_pixel=False):
