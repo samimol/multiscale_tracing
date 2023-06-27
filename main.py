@@ -36,12 +36,14 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 random.seed(seed)
     
+num_scales = args.num_scales
 
-def train_full_network(feedforward_curve,feedforward_object,one_scale,device):
+def train_full_network(feedforward_curve,feedforward_object,one_scale,device,num_scales):
+    
     grid_size = 36
     big_pixels_size = 3
     bigger_pixels_size = 9
-    n = RecurrentNetwork(3,grid_size,big_pixels_size,bigger_pixels_size,device,feedforward_curve,feedforward_object,one_scale)
+    n = RecurrentNetwork(3,grid_size,device,feedforward_curve,feedforward_object,one_scale,num_scales)
     n.duration = 30
     n.save_activities = False
 
@@ -110,10 +112,12 @@ if __name__ == '__main__':
         
     if args.full_training:
         assert device.type == 'cuda', 'full training should be done on gpu'
-        (input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve) = make_data_feedforward(device)
-        feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device)
-        feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device)
-        n,trial_corrects,generalization = train_full_network(feedforward_curve,feedforward_blob,args.one_scale,device)
+        (input_curve,labels_curve,input_blob,labels_blob) = make_data_feedforward(device,num_scales)
+        
+        feedforward_blob = train_feedforward_blob(num_scales,input_blob,labels_blob,device)
+        feedforward_curve =train_feedforward_curve(num_scales,input_curve,labels_curve,device)
+        
+        n,trial_corrects,generalization = train_full_network(feedforward_curve,feedforward_blob,args.one_scale,device,num_scales)
         
         filename = os.path.join(results_folder, 'n_' + batch_id + '.pt')
         torch.save(n, filename)
@@ -132,7 +136,7 @@ if __name__ == '__main__':
         else:
           feedforward_object = torch.load(os.path.join(feedfoward_folder,'FF_blob_' + batch_id + '.pt'), map_location=torch.device('cpu'))
             
-        n,trial_corrects,generalization = train_full_network(feedforward_curve,feedforward_object,args.one_scale,device)
+        n,trial_corrects,generalization = train_full_network(feedforward_curve,feedforward_object,args.one_scale,device,num_scales)
         
         filename = os.path.join(results_folder, 'n_' + batch_id + '.pt')
         torch.save(n, filename)

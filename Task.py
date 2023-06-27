@@ -19,9 +19,9 @@ from skimage.draw import polygon
 
 class Task():
 
-    def __init__(self, n_hidden_features,device,object_1=[],object_2=[]):
+    def __init__(self, n_hidden_features,device,grid_size,object_1=[],object_2=[]):
 
-        self.grid_size = 72
+        self.grid_size = grid_size
 
         self.state = 0
         self.trial_ended = False
@@ -76,27 +76,27 @@ class Task():
        
 class TraceCurves(Task):
     
-    def __init__(self,n_hidden_features,device,middle_pixel_size,big_pixel_size,object_1=[],object_2=[]):
-        super().__init__(n_hidden_features,device,object_1,object_2)
+    def __init__(self,n_hidden_features,device,grid_size,num_scales,object_1=[],object_2=[]):
+        super().__init__(n_hidden_features,device,grid_size,object_1,object_2)
         
-        self.middle_pixel_size = middle_pixel_size
+        self.num_scales = num_scales
+        self.RF_size_list =[3**i for i in range(1,self.num_scales)]
         
-        self.big_pixel_size = big_pixel_size
-
-        self.middle_grid_size = self.grid_size // self.middle_pixel_size
+        self.grid_size_lists = [self.grid_size // self.RF_size_list[i] for i in range(len(self.RF_size_list))]
         
-        self.big_grid_size = self.grid_size // self.big_pixel_size
-        
-    def check_not_adjacent(self,curve1,curve2,grid_size):
+    def check_not_adjacent(self,curve1,curve2,grid_size,curve_1_2):
         next_to_each_other = False
         for i in range(len(curve1)):
             for j in range(len(curve2)):
-                if np.abs(i-j) > 1 and np.array_equal(curve1,curve2): # Checking if the target curve loops on itself
+                if curve_1_2 == False and np.abs(i-j) > 1: # Checking if the target curve loops on itself
                     if np.abs(curve1[i]-curve2[j]) == grid_size or np.abs(curve1[i]-curve2[j]) == 1:
                         next_to_each_other = True
-                elif np.array_equal(curve1,curve2) == False: # Checking if the target curve and distractor curve are next to each other
-                    if np.abs(curve1[i]-curve2[j]) == grid_size or np.abs(curve1[i]-curve2[j]) == 1:
+                elif curve_1_2:
+                    if np.array_equal(curve1,curve2):
                         next_to_each_other = True
+                    else: # Checking if the target curve and distractor curve are next to each other
+                        if np.abs(curve1[i]-curve2[j]) == grid_size or np.abs(curve1[i]-curve2[j]) == 1:
+                            next_to_each_other = True
         return(next_to_each_other)
     
     def pick_object(self):
@@ -123,17 +123,14 @@ class TraceCurves(Task):
                       
                       next_to_each_other = False
       
-                      curve1_middle = np.unique([((object_1[i] // self.grid_size) // self.middle_pixel_size)*self.middle_grid_size + (object_1[i] % self.grid_size) // self.middle_pixel_size for i in range(len(object_1))])
-                      curve2_middle = np.unique([((object_2[i] // self.grid_size) // self.middle_pixel_size)*self.middle_grid_size + (object_2[i] % self.grid_size) // self.middle_pixel_size for i in range(len(object_2))])
-                      next_to_each_other_1 = self.check_not_adjacent(curve1_middle,curve1_middle,self.middle_grid_size)
-                      next_to_each_other_2 = self.check_not_adjacent(curve1_middle,curve2_middle,self.middle_grid_size)
+                      next_to_each_other_list = []
+                      for scale in range(len(self.RF_size_list)):
+                          curve1_temp = np.unique([((object_1[i] // self.grid_size) // self.RF_size_list[scale])*self.grid_size_lists[scale] + (object_1[i] % self.grid_size) // self.RF_size_list[scale] for i in range(len(object_1))])
+                          curve2_temp = np.unique([((object_2[i] // self.grid_size) // self.RF_size_list[scale])*self.grid_size_lists[scale] + (object_2[i] % self.grid_size) // self.RF_size_list[scale] for i in range(len(object_2))])
+                          next_to_each_other_list.append(self.check_not_adjacent(curve1_temp,curve1_temp,self.grid_size_lists[scale],False))
+                          next_to_each_other_list.append(self.check_not_adjacent(curve1_temp,curve2_temp,self.grid_size_lists[scale],True))
                       
-                      curve1_big = np.unique([((object_1[i] // self.grid_size) // self.big_pixel_size)*self.big_grid_size + (object_1[i] % self.grid_size) // self.big_pixel_size for i in range(len(object_1))])
-                      curve2_big = np.unique([((object_2[i] // self.grid_size) // self.big_pixel_size)*self.big_grid_size + (object_2[i] % self.grid_size) // self.big_pixel_size for i in range(len(object_2))])
-                      next_to_each_other_3 = self.check_not_adjacent(curve1_big,curve1_big,self.big_grid_size)
-                      next_to_each_other_4 = self.check_not_adjacent(curve1_big,curve2_big,self.big_grid_size)
-                      
-                      next_to_each_other = next_to_each_other_1 or next_to_each_other_2 or next_to_each_other_3 or next_to_each_other_4
+                      next_to_each_other = any(next_to_each_other_list)
                       
                     break
                   except IndexError:
@@ -171,8 +168,8 @@ class TraceCurves(Task):
         
 class TraceObjects(Task):
     
-    def __init__(self,n_hidden_features,device,object_1=[],object_2=[]):
-        super().__init__(n_hidden_features,device,object_1,object_2)
+    def __init__(self,n_hidden_features,device,grid_size,object_1=[],object_2=[]):
+        super().__init__(n_hidden_features,device,grid_size,object_1,object_2)
 
     def pick_object(self):
         if len(self.object_1) == 0:

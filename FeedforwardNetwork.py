@@ -11,21 +11,28 @@ import random
 import torch.optim as optim
 
 class FeedforwardNetwork(nn.Module): 
-    def __init__(self,device):
+    def __init__(self,device,num_scales):
         super().__init__()
 
+        self.num_scales = num_scales
+
         feats = 20
-
-        self.low_scale_feedforward = nn.Conv2d(3, 1, 1,stride=1,padding='same',bias=False,device=device)
-        self.low_scale_feedforward.weight = torch.nn.Parameter(torch.rand(self.low_scale_feedforward.weight.shape))
         
-        self.middle_scale_feedforward_interm = nn.Conv2d(1,feats, 3, stride=1,padding='same', bias=True,device=device)    
-        self.middle_scale_feedforward = nn.Conv2d(feats,1, 3 ,stride=3, bias=True,device=device)
+        self.feedforward = []
+        self.feedforward_interm = [None] #dummy module not used but just to have the right index 
         
+        self.RF_size = [3**i for i in range(num_scales)]
         
-        self.high_scale_feedforward_interm = nn.Conv2d(1,feats, 9 ,stride=1,padding='same', bias=True,device=device)
-        self.high_scale_feedforward = nn.Conv2d(feats,1, 9 ,stride=9, bias=True,device=device)
-
+        for i in range(num_scales):
+            if i == 0:
+                self.feedforward.append(nn.Conv2d(3, 1, 1,stride=1,padding='same',bias=False,device=device))
+                self.feedforward[0].weight = torch.nn.Parameter(torch.rand(self.feedforward[0].weight.shape))
+            else:
+                self.feedforward_interm.append(nn.Conv2d(1,feats, self.RF_size[i], stride=1,padding='same', bias=True,device=device)    )
+                self.feedforward.append(nn.Conv2d(feats,1, self.RF_size[i] ,stride=self.RF_size[i], bias=True,device=device))
+        
+        self.feedforward = nn.ModuleList(self.feedforward)
+        self.feedforward_interm = nn.ModuleList(self.feedforward_interm)
         
         self.sig = nn.Sigmoid()
         
@@ -33,17 +40,13 @@ class FeedforwardNetwork(nn.Module):
                
     def forward(self, x):
         
-        low_scale = F.relu(self.low_scale_feedforward(x))
+        intern_representation = [None] * (self.num_scales - 1)
+        x = F.relu(self.feedforward[0](x))
+        for layer in range(1,self.num_scales):
+            interm = F.relu(self.feedforward_interm[layer](x))
+            intern_representation[layer - 1] = self.sig(self.feedforward[layer](interm))
         
-        # Middle scale
-        middle_scale_interm = F.relu(self.middle_scale_feedforward_interm(low_scale))
-        middle_scale = self.sig(self.middle_scale_feedforward(middle_scale_interm))
-                
-        #High scale
-        high_scale_interm = F.relu(self.high_scale_feedforward_interm(low_scale))
-        high_scale = self.sig(self.high_scale_feedforward(high_scale_interm))
-        
-        return middle_scale, high_scale
+        return intern_representation
     
     
     def train(self,optimizer,criterion,input_list,labels,epochs=2,verbose=False,print_frequency=2000,batch_size=1):
@@ -74,23 +77,24 @@ class FeedforwardNetwork(nn.Module):
                 running_loss += loss.item()
                 self.loss.append(loss.cpu().detach().numpy())
                 if verbose:
-                    if count % print_frequency == print_frequency - 1:    # print every 2000 mini-batches
+                    if count % 10 == 0:    # print every 2000 mini-batches
                         print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.15f}')
                         running_loss = 0.0
 
 
-def train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device):
-    feedforward_blob = FeedforwardNetwork(device)
+def train_feedforward_blob(num_scales,input_blob,labels_blob,device):
+    feedforward_blob = FeedforwardNetwork(device,num_scales)
     feedforward_blob = feedforward_blob.to(device)
-    criterion = [nn.BCELoss(),nn.BCELoss()]
+    criterion = [nn.BCELoss() for i in range(num_scales-1)]
     optimizer = optim.Adam(feedforward_blob.parameters(), lr=0.001)
-    feedforward_blob.train(optimizer,criterion,torch.cat((input_3_blob.to(device),input_9_blob.to(device)),dim=0),[torch.cat((labels_3_blob.to(device),labels_9_other_blob.to(device)),dim=0),torch.cat((labels_3_other_blob.to(device),labels_9_blob.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
+    feedforward_blob.train(optimizer,criterion,input_blob.to(device),[labels_blob[i].to(device) for i in range(labels_blob)],epochs=80,verbose=False,batch_size=256)
     return(feedforward_blob)
 
-def train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device):
-    feedforward_curve = FeedforwardNetwork(device)
+def train_feedforward_curve(num_scales,input_curve,labels_curve,device):
+    feedforward_curve = FeedforwardNetwork(device,num_scales)
     feedforward_curve = feedforward_curve.to(device)
-    criterion = [nn.BCELoss(),nn.BCELoss()]
+    criterion = [nn.BCELoss() for i in range(num_scales-1)]
     optimizer = optim.Adam(feedforward_curve.parameters(), lr=0.001)
-    feedforward_curve.train(optimizer,criterion,torch.cat((input_3_curve.to(device),input_9_curve.to(device)),dim=0),[torch.cat((labels_3_curve.to(device),labels_9_other_curve.to(device)),dim=0),torch.cat((labels_3_other_curve.to(device),labels_9_curve.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
+
+    feedforward_curve.train(optimizer,criterion,torch.cat(input_curve,dim=0).to(device),[torch.cat(labels_curve[i],dim=0).to(device) for i in range(len(labels_curve))],epochs=80,verbose=False,batch_size=256)
     return(feedforward_curve)

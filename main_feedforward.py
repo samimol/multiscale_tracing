@@ -37,14 +37,30 @@ if __name__ == '__main__':
     if not os.path.isdir(results_folder):
         os.mkdir(results_folder)
         
-    for i in range(args.num_networks):
         
-        with open(os.path.join(data_folder,'data_' + str(i) + '.pkl'), 'rb') as input:
-            (input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve) = pickle.load(input)
- 
-        feedforward_blob = train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_9_blob,labels_9_blob,labels_9_other_blob,device)
-        feedforward_curve = train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve,device)
+    num_scales = 4
+        
+    with open('feedforward_dataset.pkl', 'rb') as input:
+        feedforward_dataset = pickle.load(input)
     
+    input_blob,labels_blob = feedforward_dataset[1][0][0] , feedforward_dataset[1][0][1]
+    
+    
+    input_curve = []
+    labels_curve = [[] for i in range(num_scales-1)]
+    for index_1,index_2 in enumerate([0,2,3]):
+        (inputt,labels_curve_interm) = feedforward_dataset[index_2][0][0] , feedforward_dataset[index_2][0][1]
+        for p in range(len(labels_curve_interm)):
+            labels_curve[p].append(labels_curve_interm[p])
+        input_curve.append(inputt)
+    
+    del feedforward_dataset
+    
+    for i in range(args.num_networks):
+
+        feedforward_blob = train_feedforward_blob(num_scales,input_blob,labels_blob,device)
+        feedforward_curve = train_feedforward_curve(num_scales,input_curve,labels_curve,device)
+        
         filename = os.path.join(results_folder,'FF_blob_' + str(i) + '.pt')
         torch.save(feedforward_blob,filename)
         

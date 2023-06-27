@@ -38,7 +38,7 @@ if __name__ == '__main__':
     
     results_folder = os.path.join('multiscale','results','feedforward_data')
         
-    data = make_data_feedforward(device)
+    data = make_data_feedforward(device,num_scales)
 
     filename = os.path.join(results_folder,'data_' + batch_id + '.pkl')
     with open(filename, 'wb') as output:  # Overwrites any existing file.

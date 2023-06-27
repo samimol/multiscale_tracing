@@ -43,8 +43,8 @@ class CustomLayer(nn.Module):
           for f in range(K.shape[0]):
               for f2 in range(K.shape[1]):
                   if not one_to_one:
-                      lower_bound = int(0.5*(2*self.grid_size-1-receptive_field_size))
-                      upper_bound = int(lower_bound + receptive_field_size)
+                      lower_bound = self.grid_size - receptive_field_size//2 - 1
+                      upper_bound = self.grid_size + receptive_field_size//2
                       K[f, f2, lower_bound:upper_bound,lower_bound:upper_bound] = 0.001 * np.random.rand()
                   else:
                     if self.layer_type != "output":
@@ -101,8 +101,8 @@ class CustomLayer(nn.Module):
             traces[:,:] = m  
         else:
             intermmask = torch.ones((2 * self.grid_size - 1, 2 * self.grid_size - 1))
-            lower_bound = int(0.5*(2*self.grid_size-1-receptive_field_size))
-            upper_bound = int(lower_bound + receptive_field_size)
+            lower_bound = self.grid_size - receptive_field_size//2 - 1
+            upper_bound = self.grid_size + receptive_field_size//2
             
             intermmask = torch.zeros((2 * self.grid_size - 1, 2 * self.grid_size - 1))
             intermmask[lower_bound:upper_bound,lower_bound:upper_bound] = 1
@@ -158,13 +158,11 @@ class CustomLayer(nn.Module):
               self.umod.to(device)
               self.feedback_mask = self.feedback_mask.to(device)
       elif self.layer_type == 'output':
-          self.high_to_output.to(device)
-          self.input_to_output.to(device)
-          self.low_to_output.to(device)
-          self.middle_to_output.to(device)
-          self.high_to_output_mask = self.high_to_output_mask.to(device)
-          self.low_to_output_mask = self.low_to_output_mask.to(device)
-          self.middle_to_output_mask = self.middle_to_output_mask.to(device)
+          for layer in range(len(self.skip_weights)):
+              self.skip_weights[layer].to(device)
+          for layer in range(1,len(self.skip_masks)):
+              self.skip_masks[layer] = self.skip_masks[layer].to(device)
+
                 
                 
 class InputLayer(CustomLayer):
@@ -185,7 +183,7 @@ class InputLayer(CustomLayer):
         self.feedback_mask = self.make_mask(self.umod.weight)
         self.inhib_mask = self.make_mask(self.wie.weight)
 
-    def forward(self, upper_y, upper_ymod, input_stimulus):
+    def forward(self, upper_ymod, input_stimulus):
         Y = input_stimulus
         VIP = self.step_function(self.umod(upper_ymod)) 
         SOM = self.activation_function(1 - VIP)
@@ -243,123 +241,104 @@ class HiddenLayer(CustomLayer):
         return(current_ymod,VIP,SOM)
         
     def update_layer(self, upper, z, beta, delta,train_v=True):
-        self.t = self.update_weight(self.t, upper[1], beta, delta, self.feedforward_mask, z[1],change_scale=self.change_scale_ff)
+        self.t = self.update_weight(self.t, upper[0], beta, delta, self.feedforward_mask, z[0],change_scale=self.change_scale_ff)
         if self.upper_ymod:
-            self.umod = self.update_weight(self.umod, upper[3], beta, delta, self.feedback_mask, z[3],change_scale = self.change_scale_fb)
-        self.horiz = self.update_weight(self.horiz, upper[3], beta, delta, self.horizontal_mask, z[3],change_scale = False)
+            self.umod = self.update_weight(self.umod, upper[2], beta, delta, self.feedback_mask, z[2],change_scale = self.change_scale_fb)
+        self.horiz = self.update_weight(self.horiz, upper[2], beta, delta, self.horizontal_mask, z[2],change_scale = False)
 
 class OutputLayer(CustomLayer):
 
-    def __init__(self, hidden_features, input_features, feature_out,grid_size,big_pixels_size,bigger_pixels_size,one_scale):
+    def __init__(self, high_features, hidden_features, input_features, feature_out,grid_size,RF_size_list):
         super().__init__()
         self.grid_size = grid_size
         K_size = 2 * self.grid_size - 1
         self.layer_type = 'output'
         self.grid_size = grid_size
-        self.big_pixels_size = big_pixels_size
-        self.bigger_pixels_size = bigger_pixels_size
+        self.RF_size_list = RF_size_list
         self.hidden_features = hidden_features
+        self.high_features = high_features
         self.feature_out = feature_out
-        self.one_scale = one_scale
         
-        self.high_to_output = nn.ConvTranspose2d(6, 1,2 * self.grid_size - 1, stride=self.bigger_pixels_size, padding=int(0.5*(2 * self.grid_size - 1 - self.bigger_pixels_size)),bias=False)#nn.ConvTranspose2d(6, feature_out, 3, stride=3, padding=0,bias=False)
-        self.low_to_output = nn.Conv2d(hidden_features, feature_out, K_size, stride=1, padding='same',bias=False)
-        self.middle_to_output = nn.ConvTranspose2d(6, 1,2 * self.grid_size - 1, stride=self.big_pixels_size, padding=int(0.5*(2 * self.grid_size - 1 - self.big_pixels_size)),bias=False)
-        self.input_to_output = nn.Conv2d(input_features, feature_out, 1, stride=1, padding='same', bias=False)
-
-        self.low_to_output_mask = torch.zeros_like(self.low_to_output.weight)  # In numpy we do the average over 49*49-49 = 2352 whereas here over 13*13 -1 = 168 so we have to divide by 14 (number of strides)
-        self.low_to_output_mask[:, :, self.grid_size - 1, self.grid_size - 1] = 1/50
-
-        self.middle_to_output_mask = torch.zeros_like(self.middle_to_output.weight)
-        self.middle_to_output_mask[:, :,self.grid_size-2:self.grid_size+1,self.grid_size-2:self.grid_size+1] = 1/50
-
-        self.high_to_output_mask = torch.zeros_like(self.high_to_output.weight,requires_grad = False)
-        self.high_to_output_mask[:, :, self.grid_size-5:self.grid_size+4,self.grid_size-5:self.grid_size+4] = 1/50
+        self.skip_weights = []
+        for layer in range(len(self.RF_size_list)):
+            if layer == 0:
+                self.skip_weights.append(nn.Conv2d(input_features, feature_out, 1, stride=self.RF_size_list[layer], padding='same', bias=False))
+            elif layer == 1:
+                self.skip_weights.append(nn.Conv2d(hidden_features, feature_out, K_size, stride=self.RF_size_list[layer], padding='same',bias=False))
+            else:
+                self.skip_weights.append(nn.ConvTranspose2d(high_features, feature_out,K_size, stride=self.RF_size_list[layer], padding=int(0.5*(2 * self.grid_size - 1 - self.RF_size_list[layer])),bias=False))
+        
+        self.skip_masks = [None]
+        for layer in range(1,len(self.RF_size_list)):
+            self.skip_masks.append(torch.zeros_like(self.skip_weights[layer].weight))
+            lower_bound = self.grid_size-(self.RF_size_list[layer]//2)-1
+            upper_bound = self.grid_size+(self.RF_size_list[layer]//2)
+            self.skip_masks[layer][:,:,lower_bound:upper_bound,lower_bound:upper_bound] = 1/50
 
         # Initializing weights
-        self.init_weights_FF(self.high_to_output,receptive_field_size=9)
-        self.init_weights_FF(self.input_to_output, one_to_one=True) 
-        self.init_weights_FF(self.low_to_output,receptive_field_size=1)
-        self.init_weights_FF(self.middle_to_output,receptive_field_size=3)
+        self.init_weights_FF(self.skip_weights[0], one_to_one=True) 
+        for layer in range(1,len(self.RF_size_list)):
+            self.init_weights_FF(self.skip_weights[layer], receptive_field_size=self.RF_size_list[layer]) 
 
+        self.skip_weights = nn.ModuleList(self.skip_weights)
 
-    def forward(self, inputmod,low_scale,middle_scale,high_scale):
-        Y =  self.input_to_output(inputmod) + self.low_to_output(low_scale) 
-        if not self.one_scale:
-            Y = Y + self.middle_to_output(middle_scale) + self.high_to_output(high_scale)
+    def forward(self, pyramidal_recurrent):
+        Y =  self.skip_weights[0](pyramidal_recurrent[0])
+        for layer in range(1,len(pyramidal_recurrent)):
+            Y = Y + self.skip_weights[layer](pyramidal_recurrent[layer])
         return(Y)
 
     def rescale(self,new_grid_size,device):
-        high_to_output = nn.ConvTranspose2d(6, 1,2 * new_grid_size - 1, stride=self.bigger_pixels_size, padding=int(0.5*(2 * new_grid_size - 1 - self.bigger_pixels_size)),bias=False)#nn.ConvTranspose2d(6, feature_out, 3, stride=3, padding=0,bias=False)
-        low_to_output = nn.Conv2d(self.hidden_features, self.feature_out, 2 * self.grid_size - 1, stride=1, padding='same',bias=False)
-        middle_to_output = nn.ConvTranspose2d(6, 1,2 * new_grid_size - 1, stride=self.big_pixels_size, padding=int(0.5*(2 * new_grid_size - 1 - self.big_pixels_size)),bias=False)
+        K_size = 2 * new_grid_size - 1
+        skip_weights = [self.skip_weights[0]]
+        for layer in range(1,len(self.RF_size_list)):
+            if layer == 1:
+                skip_weights.append(nn.Conv2d(self.hidden_features, self.feature_out, K_size, stride=self.RF_size_list[layer], padding='same',bias=False))
+            else:
+                skip_weights.append(nn.ConvTranspose2d(self.high_features, self.feature_out,K_size, stride=self.RF_size_list[layer], padding=int(0.5*(2 * new_grid_size - 1 - self.RF_size_list[layer])),bias=False))
         
-        high_to_output_weight = torch.zeros_like(high_to_output.weight)
-        lower_bound = int(0.5*(2*new_grid_size-1-self.bigger_pixels_size))
-        upper_bound = int(lower_bound + self.bigger_pixels_size)
-        non_zero_weights = torch.unique(self.high_to_output.weight[self.high_to_output.weight!=0])
-        non_zero_weights = non_zero_weights[:,None,None,None]
-        high_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = non_zero_weights
-        high_to_output.weight = torch.nn.Parameter(high_to_output_weight)
-        self.high_to_output = high_to_output
-        self.high_to_output.to(device)
-        
-        middle_to_output_weight = torch.zeros_like(middle_to_output.weight)
-        lower_bound = int(0.5*(2*new_grid_size-1-self.big_pixels_size))
-        upper_bound = int(lower_bound + self.big_pixels_size)
-        non_zero_weights = torch.unique(self.middle_to_output.weight[self.middle_to_output.weight!=0])
-        non_zero_weights = non_zero_weights[:,None,None,None]
-        middle_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = non_zero_weights
-        middle_to_output.weight = torch.nn.Parameter(middle_to_output_weight)
-        self.middle_to_output = middle_to_output
-        self.middle_to_output.to(device)
-        
-        low_to_output_weight = torch.zeros_like(low_to_output.weight)
-        lower_bound = int(0.5*(2*new_grid_size-1-1))
-        upper_bound = int(lower_bound + 1)
-        non_zero_weights = torch.unique(self.low_to_output.weight[self.low_to_output.weight!=0])
-        non_zero_weights = non_zero_weights[:,None,None,None]
-        low_to_output_weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = non_zero_weights
-        low_to_output.weight = torch.nn.Parameter(low_to_output_weight)
-        self.low_to_output = low_to_output
-        self.low_to_output.to(device)
-        
-          
-                              
+        for layer in range(1,len(self.RF_size_list)):
+            weight = torch.zeros_like(skip_weights[layer].weight)
+            lower_bound = new_grid_size - self.RF_size_list[layer]//2 - 1
+            upper_bound = new_grid_size + self.RF_size_list[layer]//2
+            non_zero_weights = torch.unique(self.skip_weights[layer].weight[self.skip_weights[layer].weight!=0])
+            non_zero_weights = non_zero_weights[:,None,None,None]
+            weight[:,:,lower_bound:upper_bound,lower_bound:upper_bound] = non_zero_weights
+            skip_weights[layer].weight = torch.nn.Parameter(weight)
+            self.skip_weights[layer] = skip_weights[layer]
+            self.skip_weights[layer].to(device)
+ 
         
     def update_layer(self, upper, beta, delta):
-        self.input_to_output = self.update_weight(self.input_to_output, upper, beta, delta, average=False)
-        self.low_to_output = self.update_weight(self.low_to_output, upper, beta, delta,self.low_to_output_mask, receptive_field_size = 1)
-        if not self.one_scale:
-            self.middle_to_output = self.update_weight(self.middle_to_output, upper, beta, delta,self.middle_to_output_mask, receptive_field_size=self.big_pixels_size)
-            self.high_to_output = self.update_weight(self.high_to_output, upper, beta, delta, self.high_to_output_mask,receptive_field_size = self.bigger_pixels_size)
+        for layer in range(len(self.skip_weights)):
+            if layer == 0:
+                self.skip_weights[layer] = self.update_weight(self.skip_weights[layer],upper,beta,delta,average=False)
+            else:
+                self.skip_weights[layer] = self.update_weight(self.skip_weights[layer],upper,beta,delta,self.skip_masks[layer],receptive_field_size = self.RF_size_list[layer])
 
 class FFLayer(CustomLayer):
 
-    def __init__(self,low_scale_feedforward,middle_scale_feedforward_interm,middle_scale_feedforward,high_scale_feedforward_interm,high_scale_feedforward):
+    def __init__(self,feedforward,feedforward_interm,num_scales):
         super().__init__()
-        self.low_scale_feedforward = low_scale_feedforward
+        self.num_scales = num_scales
+        self.feedforward = feedforward
+        self.feedforward_interm = feedforward_interm
         
-        self.middle_scale_feedforward_interm = middle_scale_feedforward_interm
-        self.middle_scale_feedforward = middle_scale_feedforward
-        
-        self.high_scale_feedforward_interm = high_scale_feedforward_interm
-        self.high_scale_feedforward = high_scale_feedforward
         self.sig = nn.Sigmoid()
 
     def forward(self, x):
-        low_scale = F.relu(self.low_scale_feedforward(x))
-        
-        # Middle scale
-        middle_scale_interm = F.relu(self.middle_scale_feedforward_interm(low_scale))
-        middle_scale = self.sig(self.middle_scale_feedforward(middle_scale_interm))
+        intern_representation = [None] * self.num_scales
+        for layer in range(self.num_scales):
+            if layer == 0:
+                x = F.relu(self.feedforward[0](x))
+                intern_representation[layer] = x
+            else:
+                interm = F.relu(self.feedforward_interm[layer](x))
+                intern_representation[layer] = self.sig(self.feedforward[layer](interm))
                 
-        # High scale
-        high_scale_interm = F.relu(self.high_scale_feedforward_interm(low_scale))
-        high_scale = self.sig(self.high_scale_feedforward(high_scale_interm))
+        intern_representation[0] = intern_representation[0].detach()
+        for layer in range(1,len(intern_representation)):
+            intern_representation[layer] = torch.relu(intern_representation[layer] - 0.7)
+            intern_representation[layer] = intern_representation[layer].detach()
         
-        # Keeping only the neurons with high probability of activation
-        middle_scale = torch.relu(middle_scale - 0.7)
-        high_scale = torch.relu(high_scale - 0.7)
-    
-        return low_scale.detach(),middle_scale.detach(),high_scale.detach()
+        return intern_representation

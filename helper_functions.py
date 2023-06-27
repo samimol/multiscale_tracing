@@ -151,12 +151,12 @@ def get_random_points(n=5, scale=0.8, mindst=None, rec=0):
     else:
         return get_random_points(n=n, scale=scale, mindst=mindst, rec=rec+1)
     
-def make_blob(grid_size):
+def make_blob(grid_size,center,scale):
     rad = 0.9999
     edgy = 0.9999
     n = 7
-    c = [np.random.randint(30),np.random.randint(30)]
-    a = get_random_points(n=n, scale=50) + c
+    c = [np.random.randint(center),np.random.randint(center)]
+    a = get_random_points(n=n, scale=scale) + c
     x,y, _ = get_bezier_curve(a,rad=rad, edgy=edgy)   
     x_blob,y_blob = polygon(x, y, (grid_size,grid_size)) #filling in
     return x_blob,y_blob
@@ -176,11 +176,9 @@ def test_network(t,CurveLength,grid_size,TrialNumber,n,device,save_activities,on
     action = 0
     n.save_activities = save_activities
     if save_activities:
-        n.saveXmod = [[]]
-        n.saveY2mod = [[]]
-        n.saveY3mod = [[]]
-        n.saveY6mod = [[]]
-        n.saveQ = [[]]
+        n.saved_activities = []
+        for layer in range(n.num_scales+2):
+            n.saved_activities.append([[]])
     for p in range(TrialNumber):
       trial_running = True
       display.append([])
