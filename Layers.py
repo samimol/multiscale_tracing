@@ -308,6 +308,15 @@ class OutputLayer(CustomLayer):
             self.skip_weights[layer] = skip_weights[layer]
             self.skip_weights[layer].to(device)
  
+        self.skip_masks = [None]
+        for layer in range(1,len(self.RF_size_list)):
+            self.skip_masks.append(torch.zeros_like(self.skip_weights[layer].weight))
+            lower_bound = new_grid_size-(self.RF_size_list[layer]//2)-1
+            upper_bound = new_grid_size+(self.RF_size_list[layer]//2)
+            self.skip_masks[layer][:,:,lower_bound:upper_bound,lower_bound:upper_bound] = 1/50
+            
+        self.grid_size = new_grid_size
+
         
     def update_layer(self, upper, beta, delta):
         for layer in range(len(self.skip_weights)):

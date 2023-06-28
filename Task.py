@@ -177,18 +177,18 @@ class TraceObjects(Task):
             edgy = 0.9999
             n = 7
             if np.random.rand() < 0.5: #first coordinates is where the target object will be
-                c = [[0,0],[70,70]]
+                c = [[0,0],[self.grid_size//2,self.grid_size//2]]
             else:
-                c = [[70,70],[0,0]]
+                c = [[self.grid_size//2,self.grid_size//2],[0,0]]
             dist = -5
-            distances = [10,20,30,40,50,60,70]
+            distances = [10,20,30,40,50,60]
             goal_dist = np.random.choice(distances)
             while not ((dist<goal_dist) and (dist>goal_dist-10)):
                 intersect = True
                 while intersect:
                   blob = []
                   for  i in range(len(c)):
-                    a = get_random_points(n=n, scale=70) + c[i]
+                    a = get_random_points(n=n, scale=90) + c[i]
                     x,y, _ = get_bezier_curve(a,rad=rad, edgy=edgy)
                     blob.append([x,y])     
                   x_blob_1,y_blob_1 = polygon(blob[0][0], blob[0][1], (self.grid_size,self.grid_size)) #filling in
