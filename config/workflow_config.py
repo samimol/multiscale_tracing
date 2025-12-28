@@ -15,17 +15,24 @@ from pathlib import Path
 from datetime import datetime
 
 # ============================================================================
-# Base Paths
+# Base Paths - Hierarchical Structure
 # ============================================================================
 
-# Project root directory
-PROJECT_ROOT = Path(__file__).parent.absolute()
+# Project root directory (go up one level from config/)
+PROJECT_ROOT = Path(__file__).parent.parent.absolute()
+
+# Data directory structure
+DATA_DIR = PROJECT_ROOT / 'data' / 'feedforward'
+
+# Models directory structure
+MODELS_DIR = PROJECT_ROOT / 'models'
+FEEDFORWARD_BLOB_DIR = MODELS_DIR / 'feedforward' / 'blob'
+FEEDFORWARD_CURVE_DIR = MODELS_DIR / 'feedforward' / 'curve'
+RECURRENT_FINAL_DIR = MODELS_DIR / 'recurrent' / 'final'
+RECURRENT_CHECKPOINT_DIR = MODELS_DIR / 'recurrent' / 'checkpoints'
 
 # Results directory structure
-RESULTS_DIR = PROJECT_ROOT / 'results'
-DATA_DIR = RESULTS_DIR / 'feedforward_data'
-FEEDFORWARD_DIR = RESULTS_DIR / 'feedforward_networks'
-RECURRENT_DIR = RESULTS_DIR / 'recurrent_networks'
+RESULTS_DIR = PROJECT_ROOT / 'results' / 'experiments'
 LOGS_DIR = RESULTS_DIR / 'logs'
 
 # ============================================================================
@@ -70,7 +77,8 @@ class FeedforwardConfig:
     
     # Input/Output paths
     input_dir = DATA_DIR
-    output_dir = FEEDFORWARD_DIR
+    blob_output_dir = FEEDFORWARD_BLOB_DIR
+    curve_output_dir = FEEDFORWARD_CURVE_DIR
     dataset_filename = 'feedforward_dataset.pkl'
     
     # Training parameters
@@ -103,9 +111,10 @@ class FeedforwardConfig:
         Returns:
             tuple: (blob_model_path, curve_model_path)
         """
-        cls.output_dir.mkdir(parents=True, exist_ok=True)
-        blob_path = cls.output_dir / f'{cls.blob_model_prefix}_{network_id}.pt'
-        curve_path = cls.output_dir / f'{cls.curve_model_prefix}_{network_id}.pt'
+        cls.blob_output_dir.mkdir(parents=True, exist_ok=True)
+        cls.curve_output_dir.mkdir(parents=True, exist_ok=True)
+        blob_path = cls.blob_output_dir / f'{cls.blob_model_prefix}_{network_id}.pt'
+        curve_path = cls.curve_output_dir / f'{cls.curve_model_prefix}_{network_id}.pt'
         return blob_path, curve_path
     
     @classmethod
@@ -125,8 +134,10 @@ class RecurrentConfig:
     """Configuration for recurrent network training."""
     
     # Input/Output paths
-    feedforward_dir = FEEDFORWARD_DIR
-    output_dir = RECURRENT_DIR
+    feedforward_blob_dir = FEEDFORWARD_BLOB_DIR
+    feedforward_curve_dir = FEEDFORWARD_CURVE_DIR
+    output_dir = RECURRENT_FINAL_DIR
+    checkpoint_dir = RECURRENT_CHECKPOINT_DIR
     
     # Training parameters
     num_networks = 1
@@ -149,8 +160,8 @@ class RecurrentConfig:
         Returns:
             tuple: (blob_model_path, curve_model_path)
         """
-        blob_path = cls.feedforward_dir / f'{FeedforwardConfig.blob_model_prefix}_{network_id}.pt'
-        curve_path = cls.feedforward_dir / f'{FeedforwardConfig.curve_model_prefix}_{network_id}.pt'
+        blob_path = cls.feedforward_blob_dir / f'{FeedforwardConfig.blob_model_prefix}_{network_id}.pt'
+        curve_path = cls.feedforward_curve_dir / f'{FeedforwardConfig.curve_model_prefix}_{network_id}.pt'
         return blob_path, curve_path
     
     @classmethod
@@ -180,8 +191,8 @@ class RecurrentConfig:
         Returns:
             Path: Full path to checkpoint file.
         """
-        cls.output_dir.mkdir(parents=True, exist_ok=True)
-        return cls.output_dir / f'{cls.checkpoint_prefix}_{network_id}_epoch_{epoch}.pt'
+        cls.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        return cls.checkpoint_dir / f'{cls.checkpoint_prefix}_{network_id}_epoch_{epoch}.pt'
     
     @classmethod
     def check_feedforward_exists(cls, network_id=0):
@@ -228,10 +239,12 @@ class LogConfig:
 def create_directory_structure():
     """Create all necessary directories for the workflow."""
     directories = [
-        RESULTS_DIR,
         DATA_DIR,
-        FEEDFORWARD_DIR,
-        RECURRENT_DIR,
+        FEEDFORWARD_BLOB_DIR,
+        FEEDFORWARD_CURVE_DIR,
+        RECURRENT_FINAL_DIR,
+        RECURRENT_CHECKPOINT_DIR,
+        RESULTS_DIR,
         LOGS_DIR
     ]
     

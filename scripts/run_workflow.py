@@ -26,9 +26,14 @@ Usage:
 import argparse
 import subprocess
 import sys
+import os
 from pathlib import Path
 
-from workflow_config import (
+# Add project root to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from config.workflow_config import (
     check_workflow_status,
     print_workflow_status,
     create_directory_structure,
@@ -44,8 +49,9 @@ def run_stage_1():
     print("RUNNING STAGE 1: DATA GENERATION")
     print("="*70)
     
+    script_path = Path(__file__).parent / "train" / "01_generate_data.py"
     result = subprocess.run(
-        [sys.executable, "main_data_feedforward.py"],
+        [sys.executable, str(script_path)],
         capture_output=False
     )
     
@@ -69,8 +75,9 @@ def run_stage_2():
         print("Please run Stage 1 first: python run_workflow.py --stage 1")
         return False
     
+    script_path = Path(__file__).parent / "train" / "02_train_feedforward.py"
     result = subprocess.run(
-        [sys.executable, "main_feedforward.py"],
+        [sys.executable, str(script_path)],
         capture_output=False
     )
     
@@ -95,8 +102,9 @@ def run_stage_3():
         print("Please run Stage 2 first: python run_workflow.py --stage 2")
         return False
     
+    script_path = Path(__file__).parent / "train" / "03_train_recurrent.py"
     result = subprocess.run(
-        [sys.executable, "main.py"],
+        [sys.executable, str(script_path)],
         capture_output=False
     )
     

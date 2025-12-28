@@ -29,10 +29,14 @@ import pickle
 import sys
 from pathlib import Path
 
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 # Import project modules
-from config import parser
-from feedforward_network import train_feedforward_blob, train_feedforward_curve
-from workflow_config import (
+from config.model_config import parser
+from src.models.feedforward_network import train_feedforward_blob, train_feedforward_curve
+from config.workflow_config import (
     FeedforwardConfig, 
     create_directory_structure, 
     print_workflow_status

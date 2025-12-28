@@ -23,9 +23,13 @@ import pickle
 import sys
 from pathlib import Path
 
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 # Import project modules
-from feedforward_data import make_data_feedforward
-from workflow_config import DataConfig, create_directory_structure, print_workflow_status
+from src.data.feedforward_data import make_data_feedforward
+from config.workflow_config import DataConfig, create_directory_structure, print_workflow_status
 
 
 def main():
