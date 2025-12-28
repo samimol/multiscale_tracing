@@ -14,7 +14,7 @@ Created on Fri Oct 29 13:13:17 2021
 
 import numpy as np
 import torch
-from helper_functions import make_curves, get_random_points, get_bezier_curve
+from src.utils.helper_functions import make_curves, get_random_points, get_bezier_curve
 from skimage.draw import polygon
 
 class Task():
