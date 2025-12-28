@@ -31,64 +31,64 @@ class CustomLayer(nn.Module):
       param = 100
       return torch.relu(param*x/(torch.sqrt(1+(param**2)*(x**2))))
 
-    def init_weights_FF(self, layer, one_to_one=False,change_scale=False,receptive_field_size=1):
-        K = torch.zeros(layer.weight.shape)
+    def initialize_feedforward_weights(self, layer, one_to_one=False, change_scale=False, receptive_field_size=1):
+        weights = torch.zeros(layer.weight.shape)
         if layer.bias is not None:
             bias = torch.zeros(layer.bias.shape)
         if change_scale:
-          for f in range(K.shape[0]):
-            for f2 in range(K.shape[1]):
-              K[f, f2, :, :] = self.initialisation_range * np.random.rand() + 1
+          for f in range(weights.shape[0]):
+            for f2 in range(weights.shape[1]):
+              weights[f, f2, :, :] = self.initialisation_range * np.random.rand() + 1
         else:
-          for f in range(K.shape[0]):
-              for f2 in range(K.shape[1]):
+          for f in range(weights.shape[0]):
+              for f2 in range(weights.shape[1]):
                   if not one_to_one:
                       lower_bound = self.grid_size - receptive_field_size//2 - 1
                       upper_bound = self.grid_size + receptive_field_size//2
-                      K[f, f2, lower_bound:upper_bound,lower_bound:upper_bound] = 0.001 * np.random.rand()
+                      weights[f, f2, lower_bound:upper_bound,lower_bound:upper_bound] = 0.001 * np.random.rand()
                   else:
                     if self.layer_type != "output":
-                        K[f,f2,0] =  self.initialisation_range * np.random.rand() + 1
+                        weights[f,f2,0] =  self.initialisation_range * np.random.rand() + 1
                     else:
-                        K[f, f2, 0] = 0.001 + 0.001 * np.random.rand()
+                        weights[f, f2, 0] = 0.001 + 0.001 * np.random.rand()
         if layer.bias is not None:
           for f in range(bias.shape[0]):  
                 bias[f] = 1
-        layer.weight = torch.nn.Parameter(K)
+        layer.weight = torch.nn.Parameter(weights)
         if layer.bias is not None:
             layer.bias = torch.nn.Parameter(bias)
 
-    def init_weights_FB(self, layer, change_scale=False):
-        K = torch.zeros(layer.weight.shape)
+    def initialize_feedback_weights(self, layer, change_scale=False):
+        weights = torch.zeros(layer.weight.shape)
         if layer.bias is not None:
             bias = torch.zeros(layer.bias.shape)                                        
-        for f in range(K.shape[0]):
+        for f in range(weights.shape[0]):
               for f2 in range(K.shape[1]):
                 if self.layer_type != "output":
                   if change_scale:
-                    K[f, f2, :, :] = self.initialisation_range * np.random.rand() + 0.5
+                    weights[f, f2, :, :] = self.initialisation_range * np.random.rand() + 0.5
                   else:
-                      K[f, f2, 0,1] = self.initialisation_range * np.random.rand() + 0.1
-                      K[f, f2, 1,0] = self.initialisation_range * np.random.rand() + 0.1
-                      K[f, f2, 1,2] = self.initialisation_range * np.random.rand() + 0.1
-                      K[f, f2, 2,1] = self.initialisation_range * np.random.rand() + 0.1               
-        layer.weight = torch.nn.Parameter(K)
+                      weights[f, f2, 0,1] = self.initialisation_range * np.random.rand() + 0.1
+                      weights[f, f2, 1,0] = self.initialisation_range * np.random.rand() + 0.1
+                      weights[f, f2, 1,2] = self.initialisation_range * np.random.rand() + 0.1
+                      weights[f, f2, 2,1] = self.initialisation_range * np.random.rand() + 0.1               
+        layer.weight = torch.nn.Parameter(weights)
         if layer.bias is not None:
             layer.bias = torch.nn.Parameter(bias)
 
 
-    def init_weights_inhib(self, layer):
-        K = torch.zeros(layer.weight.shape)
+    def initialize_inhibitory_weights(self, layer):
+        weights = torch.zeros(layer.weight.shape)
         if layer.bias is not None:
             bias = torch.zeros(layer.bias.shape)
-        for f in range(K.shape[0]):
-              for f2 in range(K.shape[1]):
+        for f in range(weights.shape[0]):
+              for f2 in range(weights.shape[1]):
                 if f == f2 :
-                    K[f, f2, 1, 1] = 1
+                    weights[f, f2, 1, 1] = 1
         if layer.bias is not None:
           for f in range(bias.shape[0]):  
               bias[f] =  -1 - self.initialisation_range * np.random.rand()
-        layer.weight = torch.nn.Parameter(K)
+        layer.weight = torch.nn.Parameter(weights)
         if layer.bias is not None:
             layer.bias = torch.nn.Parameter(bias)
 
@@ -145,17 +145,17 @@ class CustomLayer(nn.Module):
         
     def to(self, device):
       if self.layer_type == 'input':
-          self.umod.to(device)
-          self.wie.to(device)
+          self.upper_modulation.to(device)
+          self.lateral_inhibition.to(device)
           self.feedback_mask = self.feedback_mask.to(device)
-          self.inhib_mask = self.inhib_mask.to(device)
+          self.inhibition_mask = self.inhibition_mask.to(device)
       elif self.layer_type == 'hidden':
-          self.t.to(device)
+          self.feedforward_connection.to(device)
           self.feedforward_mask = self.feedforward_mask.to(device)
           self.horizontal_mask = self.horizontal_mask.to(device)
-          self.horiz.to(device)
+          self.horizontal_connection.to(device)
           if self.upper_ymod:
-              self.umod.to(device)
+              self.upper_modulation.to(device)
               self.feedback_mask = self.feedback_mask.to(device)
       elif self.layer_type == 'output':
           for layer in range(len(self.skip_weights)):
@@ -172,28 +172,28 @@ class InputLayer(CustomLayer):
         self.layer_type = 'input'
         K_size = 3
 
-        self.umod = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same',bias=False)
-        self.wie = nn.Conv2d(feature_in, feature_in, K_size, stride=1, padding='same',bias=True)
+        self.upper_modulation = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same',bias=False)
+        self.lateral_inhibition = nn.Conv2d(feature_in, feature_in, K_size, stride=1, padding='same',bias=True)
 
         # Initializing weights
-        self.init_weights_FB(self.umod)
-        self.init_weights_inhib(self.wie)
+        self.initialize_feedback_weights(self.upper_modulation)
+        self.initialize_inhibitory_weights(self.lateral_inhibition)
 
         # Setting the mask to have connections only between neighboours
-        self.feedback_mask = self.make_mask(self.umod.weight)
-        self.inhib_mask = self.make_mask(self.wie.weight)
+        self.feedback_mask = self.make_mask(self.upper_modulation.weight)
+        self.inhibition_mask = self.make_mask(self.lateral_inhibition.weight)
 
     def forward(self, upper_ymod, input_stimulus):
         Y = input_stimulus
-        VIP = self.step_function(self.umod(upper_ymod)) 
-        SOM = self.activation_function(1 - VIP)
-        Ymod =  self.activation_function((-self.wie(SOM)) * self.gating_function(Y))
-        return(Ymod,VIP,SOM)
+        vip_activity = self.step_function(self.upper_modulation(upper_ymod)) 
+        som_activity = self.activation_function(1 - vip_activity)
+        modulated_output =  self.activation_function((-self.lateral_inhibition(som_activity)) * self.gating_function(Y))
+        return(modulated_output, vip_activity, som_activity)
 
 
     def update_layer(self, upper, z, beta, delta):
-        self.umod = self.update_weight(self.umod, upper[2], beta, delta, self.feedback_mask, z[2],change_scale=False)
-        self.wie = self.update_weight(self.wie, upper[0], beta, delta, self.inhib_mask, z[0],inhib=True)
+        self.upper_modulation = self.update_weight(self.upper_modulation, upper[2], beta, delta, self.feedback_mask, z[2],change_scale=False)
+        self.lateral_inhibition = self.update_weight(self.lateral_inhibition, upper[0], beta, delta, self.inhibition_mask, z[0],inhib=True)
 
 class HiddenLayer(CustomLayer):
 
@@ -209,42 +209,42 @@ class HiddenLayer(CustomLayer):
         
         # Making the weights
         if self.change_scale_ff:
-          self.t = nn.Conv2d(feature_in_lower, feature_out, self.big_pixels_size, stride=self.big_pixels_size, bias=True)
+          self.feedforward_connection = nn.Conv2d(feature_in_lower, feature_out, self.big_pixels_size, stride=self.big_pixels_size, bias=True)
         else:
-            self.t = nn.Conv2d(feature_in_lower, feature_out, 1, stride=1, padding='same', bias=True)     
+            self.feedforward_connection = nn.Conv2d(feature_in_lower, feature_out, 1, stride=1, padding='same', bias=True)     
         
         if upper_ymod:
-            self.umod = nn.ConvTranspose2d(feature_in_higher, feature_out, self.big_pixels_size, stride=self.big_pixels_size, padding=0,bias=False)
-        self.horiz = nn.Conv2d(feature_out,feature_out,3,stride = 1,padding='same',bias=False)
+            self.upper_modulation = nn.ConvTranspose2d(feature_in_higher, feature_out, self.big_pixels_size, stride=self.big_pixels_size, padding=0,bias=False)
+        self.horizontal_connection = nn.Conv2d(feature_out,feature_out,3,stride = 1,padding='same',bias=False)
         
         # Initializing the weights
-        self.init_weights_FF(self.t,change_scale = change_scale_ff,one_to_one=True)
+        self.initialize_feedforward_weights(self.feedforward_connection,change_scale = change_scale_ff,one_to_one=True)
         if upper_ymod:
-            self.init_weights_FB(self.umod,change_scale = change_scale_fb)
-        self.init_weights_FB(self.horiz,change_scale=False)
+            self.initialize_feedback_weights(self.upper_modulation,change_scale = change_scale_fb)
+        self.initialize_feedback_weights(self.horizontal_connection,change_scale=False)
 
         # Making the masks        
         if upper_ymod:
-            self.feedback_mask = self.make_mask(self.umod.weight)
-        self.feedforward_mask = self.make_mask(self.t.weight)
-        self.horizontal_mask = self.make_mask(self.horiz.weight)
+            self.feedback_mask = self.make_mask(self.upper_modulation.weight)
+        self.feedforward_mask = self.make_mask(self.feedforward_connection.weight)
+        self.horizontal_mask = self.make_mask(self.horizontal_connection.weight)
    
 
     def forward(self,current_y, lower_ymod=None, upper_ymod=None,horiz=None):
-        FF = self.t(lower_ymod)
+        feedforward_input = self.feedforward_connection(lower_ymod)
         if upper_ymod is not None:
-            VIP = self.step_function(self.umod(upper_ymod) + self.horiz(horiz)) #* self.gating_function(Y)
+            vip_activity = self.step_function(self.upper_modulation(upper_ymod) + self.horizontal_connection(horiz))
         else:
-            VIP = self.step_function(self.horiz(horiz)) #* self.gating_function(Y)
-        SOM = self.activation_function(1 - VIP)
-        current_ymod =  self.activation_function((FF-SOM) * self.gating_function(current_y))
-        return(current_ymod,VIP,SOM)
+            vip_activity = self.step_function(self.horizontal_connection(horiz))
+        som_activity = self.activation_function(1 - vip_activity)
+        modulated_output =  self.activation_function((feedforward_input - som_activity) * self.gating_function(current_y))
+        return(modulated_output, vip_activity, som_activity)
         
     def update_layer(self, upper, z, beta, delta,train_v=True):
-        self.t = self.update_weight(self.t, upper[0], beta, delta, self.feedforward_mask, z[0],change_scale=self.change_scale_ff)
+        self.feedforward_connection = self.update_weight(self.feedforward_connection, upper[0], beta, delta, self.feedforward_mask, z[0],change_scale=self.change_scale_ff)
         if self.upper_ymod:
-            self.umod = self.update_weight(self.umod, upper[2], beta, delta, self.feedback_mask, z[2],change_scale = self.change_scale_fb)
-        self.horiz = self.update_weight(self.horiz, upper[2], beta, delta, self.horizontal_mask, z[2],change_scale = False)
+            self.upper_modulation = self.update_weight(self.upper_modulation, upper[2], beta, delta, self.feedback_mask, z[2],change_scale = self.change_scale_fb)
+        self.horizontal_connection = self.update_weight(self.horizontal_connection, upper[2], beta, delta, self.horizontal_mask, z[2],change_scale = False)
 
 class OutputLayer(CustomLayer):
 
@@ -276,9 +276,9 @@ class OutputLayer(CustomLayer):
             self.skip_masks[layer][:,:,lower_bound:upper_bound,lower_bound:upper_bound] = 1/50
 
         # Initializing weights
-        self.init_weights_FF(self.skip_weights[0], one_to_one=True) 
+        self.initialize_feedforward_weights(self.skip_weights[0], one_to_one=True) 
         for layer in range(1,len(self.RF_size_list)):
-            self.init_weights_FF(self.skip_weights[layer], receptive_field_size=self.RF_size_list[layer]) 
+            self.initialize_feedforward_weights(self.skip_weights[layer], receptive_field_size=self.RF_size_list[layer]) 
 
         self.skip_weights = nn.ModuleList(self.skip_weights)
 
@@ -325,7 +325,7 @@ class OutputLayer(CustomLayer):
             else:
                 self.skip_weights[layer] = self.update_weight(self.skip_weights[layer],upper,beta,delta,self.skip_masks[layer],receptive_field_size = self.RF_size_list[layer])
 
-class FFLayer(CustomLayer):
+class FeedforwardLayer(CustomLayer):
 
     def __init__(self,feedforward,feedforward_interm,num_scales):
         super().__init__()

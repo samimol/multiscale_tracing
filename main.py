@@ -11,12 +11,12 @@ import numpy as np
 import random
 import os
 import datetime
-from FF_data import *
-from FeedforwardNetwork import *
-from RecurrentNetwork import *
-from Task import *
+from feedforward_data import *
+from feedforward_network import *
+from recurrent_network import *
+from tasks import *
 from helper_functions import *
-from opts import parser
+from config import parser
 import torch.optim as optim
 
 if os.name == 'nt':
@@ -71,13 +71,13 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device,num
     
     for i in range(trials):
         trial_running = True
-        new_input, reward, trialEnd= t.do_step(action)
+        new_input, reward, trialEnd= t.step(action)
         if i > 2000:
             n.beta = 0.02
         while trial_running:
-          action = n.do_step(new_input,reward,trialEnd,device)
-          new_input, reward, trialEnd = t.do_step(action)
-          n.do_learn(reward)
+          action = n.step(new_input,reward,trialEnd,device)
+          new_input, reward, trialEnd = t.step(action)
+          n.learn(reward)
           if trialEnd:
                 trial_running = False
                 t.curve_length = np.random.randint(max_length-min_length+1) + min_length

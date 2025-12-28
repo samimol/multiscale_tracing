@@ -18,7 +18,7 @@ import random
 import os
 import datetime
 import pickle
-from FF_data import *
+from feedforward_data import *
 
     
 device = torch.device('cpu')

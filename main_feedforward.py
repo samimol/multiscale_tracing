@@ -11,10 +11,10 @@ import numpy as np
 import random
 import os
 import datetime
-from opts import parser
+from config import parser
 import pickle
-from FF_data import *
-from FeedforwardNetwork import *
+from feedforward_data import *
+from feedforward_network import *
 from helper_functions import *
 
     

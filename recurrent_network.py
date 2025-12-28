@@ -5,7 +5,7 @@ Created on Tue Jan  3 15:28:45 2023
 @author: Sami
 """
 
-from Layers import InputLayer, HiddenLayer, OutputLayer, FFLayer
+from layers import InputLayer, HiddenLayer, OutputLayer, FeedforwardLayer
 import torch
 import numpy as np
 
@@ -47,8 +47,8 @@ class RecurrentNetwork():
             elif i == num_scales - 1:
                 self.layers_list.append(HiddenLayer(self.high_feature,self.high_feature,self.high_feature,RF_size,grid_size,upper_ymod = False,change_scale_ff=True))
         self.layers_list.append(OutputLayer(self.high_feature,self.n_hidden_features, self.n_input_features, 1,self.grid_size,self.RF_size_list))
-        self.feedforward_network_curve = FFLayer(feedforward_curve.feedforward,feedforward_curve.feedforward_interm,num_scales)
-        self.feedforward_network_object = FFLayer(feedforward_object.feedforward,feedforward_object.feedforward_interm,num_scales)
+        self.feedforward_network_curve = FeedforwardLayer(feedforward_curve.feedforward,feedforward_curve.feedforward_interm,num_scales)
+        self.feedforward_network_object = FeedforwardLayer(feedforward_object.feedforward,feedforward_object.feedforward_interm,num_scales)
 
         self.task = 'trace_curve'
 
@@ -56,10 +56,10 @@ class RecurrentNetwork():
         
         self.saved_activities = [[] for i in range(num_scales+2)]
         
-        self.to()
+        self.to_device()
 
         
-    def do_step(self, input_env, reward, reset_traces, device):
+    def step(self, input_env, reward, reset_traces, device):
 
         if self.save_activities:
             for layer in range(len(self.saved_activities)):
@@ -105,9 +105,9 @@ class RecurrentNetwork():
                 for layer in range(len(self.saved_activities)-1):
                     self.saved_activities[layer][len(self.saved_activities[layer]) - 1].append(self.pyramidal_recurrent[layer].detach())
           
-                self.Z = self.calc_output(device)
+                self.output_values = self.calculate_output(device)
                 
-                self.saved_activities[-1][len(self.saved_activities[-1]) - 1].append(self.Z.detach())
+                self.saved_activities[-1][len(self.saved_activities[-1]) - 1].append(self.output_values.detach())
 
             with torch.no_grad():
                 norm = torch.linalg.norm(self.pyramidal_recurrent[1][0, :, :]-prev_low[0, :, :])
@@ -147,10 +147,10 @@ class RecurrentNetwork():
         (self.pyramidal_recurrent[-1],self.VIP[-1],self.SOM[-1]) = self.layers_list[layer+1].forward(self.pyramidal_feedforward[layer+1],lower_ymod = self.pyramidal_recurrent[-2],upper_ymod = None,horiz=self.pyramidal_recurrent_detached[-1])
                                                                                     
         
-        self.Z = self.calc_output(device)
+        self.output_values = self.calculate_output(device)
 
         if self.save_activities:
-            self.saved_activities[-1][len(self.saved_activities[-1]) - 1].append(self.Z.detach())
+            self.saved_activities[-1][len(self.saved_activities[-1]) - 1].append(self.output_values.detach())
 
         with torch.no_grad():
             action_chosen = torch.zeros((1, 1, 2+self.grid_size**2))
@@ -158,84 +158,80 @@ class RecurrentNetwork():
 
         return (action_chosen)
 
-    def calc_output(self, device):
-        Z = self.layers_list[-1].forward(self.pyramidal_recurrent)
+    def calculate_output(self, device):
+        output = self.layers_list[-1].forward(self.pyramidal_recurrent)
         with torch.no_grad():
-            ZZ =torch.flatten(Z.permute(0,1,3,2), start_dim=2) #Flatten in F order beause everything is in F order
+            flattened_output = torch.flatten(output.permute(0,1,3,2), start_dim=2)
             if np.random.rand() < self.exploitation_probability:
-                winner = self.calc_maxQ(ZZ)
+                winner = self.calculate_max_q_value(flattened_output)
             else:
-                ZZint = ZZ.detach()
-                ZZint -= torch.max(ZZint)
-                ZZint = torch.exp(ZZint) / torch.sum(torch.exp(ZZint))
-                winner = self.calc_softWTA(ZZint, device)
-            self.index_selected = winner # index_selected represents the index of the action chosen on a flattened grid
+                probabilities = flattened_output.detach()
+                probabilities -= torch.max(probabilities)
+                probabilities = torch.exp(probabilities) / torch.sum(torch.exp(probabilities))
+                winner = self.calculate_soft_winner_take_all(probabilities, device)
+            self.index_selected = winner
             winner = [torch.tensor([0]), torch.tensor([0]), torch.tensor([(winner)%self.grid_size]), torch.tensor([torch.div(winner,self.grid_size,rounding_mode='floor')])]
-            self.action = winner # action represents the coordinates of the action chosen
+            self.action = winner
 
-        return Z
+        return output
 
-    def calc_maxQ(self, Z):
-        winner = torch.where(Z == torch.max(Z))[-1]
-        # Break ties randomly
+    def calculate_max_q_value(self, q_values):
+        winner = torch.where(q_values == torch.max(q_values))[-1]
         if len(winner) > 1:
             tiebreak = winner[torch.randint(0, len(winner), (1,))]
             winner = tiebreak
         return winner
 
-    def calc_softWTA(self, probabilities, device):
-        # Create wheel:
-        probs = torch.cumsum(probabilities, 2)[0][0]
-
-        # Select from wheel
-        rnd = torch.rand((1,), device=self.device)
-        for (i, prob) in enumerate(probs):
-            if rnd <= prob:
+    def calculate_soft_winner_take_all(self, probabilities, device):
+        cumulative_probs = torch.cumsum(probabilities, 2)[0][0]
+        random_value = torch.rand((1,), device=self.device)
+        for (i, prob) in enumerate(cumulative_probs):
+            if random_value <= prob:
                 return i
 
-    def accessory(self):
+    def compute_gradients(self):
 
-        init_pyramidal = torch.autograd.grad(self.Z[self.action], self.pyramidal_recurrent, retain_graph=True, allow_unused=True)
-        init_VIP = torch.autograd.grad(self.Z[self.action], self.VIP, retain_graph=True, allow_unused=True)
-        init_SOM = torch.autograd.grad(self.Z[self.action], self.SOM, retain_graph=True, allow_unused=True)
+        initial_gradient_pyramidal = torch.autograd.grad(self.output_values[self.action], self.pyramidal_recurrent, retain_graph=True, allow_unused=True)
+        initial_gradient_vip = torch.autograd.grad(self.output_values[self.action], self.VIP, retain_graph=True, allow_unused=True)
+        initial_gradient_som = torch.autograd.grad(self.output_values[self.action], self.SOM, retain_graph=True, allow_unused=True)
         
-        Z_pyramidal = [init_pyramidal[i] for i in range(len(init_pyramidal))]
-        Z_VIP = [init_VIP[i] for i in range(len(init_VIP))]
-        Z_SOM = [init_SOM[i] for i in range(len(init_SOM))]
+        gradient_pyramidal = [initial_gradient_pyramidal[i] for i in range(len(initial_gradient_pyramidal))]
+        gradient_vip = [initial_gradient_vip[i] for i in range(len(initial_gradient_vip))]
+        gradient_som = [initial_gradient_som[i] for i in range(len(initial_gradient_som))]
 
         for i in range(7):
 
-            for layer in range(len(Z_pyramidal)-1,-1,-1):
-                Z_VIP[layer] = torch.autograd.grad(self.SOM[layer], self.VIP[layer], grad_outputs=Z_SOM[layer], retain_graph=True, allow_unused=True)[0]           
-                Z_VIP[layer] = Z_VIP[layer] + init_VIP[layer]
+            for layer in range(len(gradient_pyramidal)-1,-1,-1):
+                gradient_vip[layer] = torch.autograd.grad(self.SOM[layer], self.VIP[layer], grad_outputs=gradient_som[layer], retain_graph=True, allow_unused=True)[0]           
+                gradient_vip[layer] = gradient_vip[layer] + initial_gradient_vip[layer]
                 
-                Z_SOM[layer] =  torch.autograd.grad(self.pyramidal_recurrent[layer], self.SOM[layer], grad_outputs=Z_pyramidal[layer], retain_graph=True, allow_unused=True)[0]           
-                Z_SOM[layer] = Z_SOM[layer] + init_SOM[layer] 
+                gradient_som[layer] =  torch.autograd.grad(self.pyramidal_recurrent[layer], self.SOM[layer], grad_outputs=gradient_pyramidal[layer], retain_graph=True, allow_unused=True)[0]           
+                gradient_som[layer] = gradient_som[layer] + initial_gradient_som[layer] 
                 
                 if layer != 0:
-                    Z_pyramidal[layer] = torch.autograd.grad(self.prev_VIP[layer], self.prev_prev_pyramidal[layer], grad_outputs=Z_VIP[layer], retain_graph=True, allow_unused=True)[0]
-                    Z_pyramidal[layer] = Z_pyramidal[layer] + torch.autograd.grad(self.prev_VIP[layer-1], self.prev_prev_pyramidal[layer], grad_outputs=Z_VIP[layer-1], retain_graph=True, allow_unused=True)[0]
-                if layer != len(Z_pyramidal) - 1:
+                    gradient_pyramidal[layer] = torch.autograd.grad(self.prev_VIP[layer], self.prev_prev_pyramidal[layer], grad_outputs=gradient_vip[layer], retain_graph=True, allow_unused=True)[0]
+                    gradient_pyramidal[layer] = gradient_pyramidal[layer] + torch.autograd.grad(self.prev_VIP[layer-1], self.prev_prev_pyramidal[layer], grad_outputs=gradient_vip[layer-1], retain_graph=True, allow_unused=True)[0]
+                if layer != len(gradient_pyramidal) - 1:
                     if layer == 0:
-                        Z_pyramidal[layer] = torch.autograd.grad(self.pyramidal_recurrent[layer+1], self.pyramidal_recurrent[layer], grad_outputs=Z_pyramidal[layer+1], retain_graph=True, allow_unused=True)[0]
+                        gradient_pyramidal[layer] = torch.autograd.grad(self.pyramidal_recurrent[layer+1], self.pyramidal_recurrent[layer], grad_outputs=gradient_pyramidal[layer+1], retain_graph=True, allow_unused=True)[0]
                     else:
-                        Z_pyramidal[layer] = Z_pyramidal[layer] + torch.autograd.grad(self.pyramidal_recurrent[layer+1], self.pyramidal_recurrent[layer], grad_outputs=Z_pyramidal[layer+1], retain_graph=True, allow_unused=True)[0]
-                Z_pyramidal[layer] = Z_pyramidal[layer] + init_pyramidal[layer]
+                        gradient_pyramidal[layer] = gradient_pyramidal[layer] + torch.autograd.grad(self.pyramidal_recurrent[layer+1], self.pyramidal_recurrent[layer], grad_outputs=gradient_pyramidal[layer+1], retain_graph=True, allow_unused=True)[0]
+                gradient_pyramidal[layer] = gradient_pyramidal[layer] + initial_gradient_pyramidal[layer]
 
 
-        return (Z_pyramidal,Z_VIP,Z_SOM)
+        return (gradient_pyramidal, gradient_vip, gradient_som)
 
-    def do_learn(self, reward):
+    def learn(self, reward):
         with torch.no_grad():
-            exp_value = self.Z[self.action]
-            self.delta = reward - exp_value
+            expected_value = self.output_values[self.action]
+            self.delta = reward - expected_value
 
-        (Z_pyramidal,Z_VIP,Z_SOM) = self.accessory()
+        (gradient_pyramidal, gradient_vip, gradient_som) = self.compute_gradients()
 
-        self.layers_list[0].update_layer([self.pyramidal_recurrent[0],self.SOM[0],self.VIP[0]],[Z_pyramidal[0],Z_SOM[0],Z_VIP[0]],self.beta,self.delta)
+        self.layers_list[0].update_layer([self.pyramidal_recurrent[0],self.SOM[0],self.VIP[0]],[gradient_pyramidal[0],gradient_som[0],gradient_vip[0]],self.beta,self.delta)
         for layer in range(1,len(self.layers_list)-1):
-            self.layers_list[layer].update_layer([self.pyramidal_recurrent[layer],self.SOM[layer],self.VIP[layer]],[Z_pyramidal[layer],Z_SOM[layer],Z_VIP[layer]],self.beta,self.delta,train_v=False)
-        self.layers_list[-1].update_layer(self.Z[self.action], self.beta, self.delta)
+            self.layers_list[layer].update_layer([self.pyramidal_recurrent[layer],self.SOM[layer],self.VIP[layer]],[gradient_pyramidal[layer],gradient_som[layer],gradient_vip[layer]],self.beta,self.delta,train_v=False)
+        self.layers_list[-1].update_layer(self.output_values[self.action], self.beta, self.delta)
 
     def detach_and_reattach(self, x):
         detached = [xx.detach() for xx in x]
@@ -243,7 +239,7 @@ class RecurrentNetwork():
             xx.requires_grad = True
         return(detached)
 
-    def to(self):
+    def to_device(self):
         for layer in range(len(self.layers_list)):
             self.layers_list[layer].to(self.device)
 

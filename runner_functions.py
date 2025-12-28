@@ -9,8 +9,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import random
-from FF_data import *
-from FeedforwardNetwork import *
+from feedforward_data import *
+from feedforward_network import *
 from helper_functions import *
 
 def make_data_feedforward(seed):
@@ -32,7 +32,7 @@ def train_feedforward_blob(input_3_blob,labels_3_blob,labels_3_other_blob,input_
     feedforward_blob = feedforward_blob.to(device)
     criterion = [nn.BCELoss(),nn.BCELoss()]
     optimizer = optim.Adam(feedforward_blob.parameters(), lr=0.001)
-    feedforward_blob.train(optimizer,criterion,torch.cat((input_3_blob.to(device),input_9_blob.to(device)),dim=0),[torch.cat((labels_3_blob.to(device),labels_9_other_blob.to(device)),dim=0),torch.cat((labels_3_other_blob.to(device),labels_9_blob.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
+    feedforward_blob.train_network(optimizer,criterion,torch.cat((input_3_blob.to(device),input_9_blob.to(device)),dim=0),[torch.cat((labels_3_blob.to(device),labels_9_other_blob.to(device)),dim=0),torch.cat((labels_3_other_blob.to(device),labels_9_blob.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
     return(feedforward_blob)
 
 def train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,input_9_curve,labels_9_curve,labels_9_other_curve):
@@ -41,7 +41,7 @@ def train_feedforward_curve(input_3_curve,labels_3_curve,labels_3_other_curve,in
     feedforward_curve = feedforward_blob.to(device)
     criterion = [nn.BCELoss(),nn.BCELoss()]
     optimizer = optim.Adam(feedforward_blob.parameters(), lr=0.001)
-    feedforward_curve.train(optimizer,criterion,torch.cat((input_3_curve.to(device),input_9_curve.to(device)),dim=0),[torch.cat((labels_3_curve.to(device),labels_9_other_curve.to(device)),dim=0),torch.cat((labels_3_other_curve.to(device),labels_9_curve.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
+    feedforward_curve.train_network(optimizer,criterion,torch.cat((input_3_curve.to(device),input_9_curve.to(device)),dim=0),[torch.cat((labels_3_curve.to(device),labels_9_other_curve.to(device)),dim=0),torch.cat((labels_3_other_curve.to(device),labels_9_curve.to(device)),dim=0)],epochs=80,verbose=False,batch_size=256)
     return(feedforward_blob)
 
 def train_full_network(feedforward_curve,feedforward_object):
@@ -73,12 +73,12 @@ def train_full_network(feedforward_curve,feedforward_object):
 
     for i in range(trials):
         trial_running = True
-        new_input, reward, trialEnd= t.do_step(action)
+        new_input, reward, trialEnd= t.step(action)
     
         while trial_running:
-          action = n.do_step(new_input,reward,trialEnd,device)
-          new_input, reward, trialEnd = t.do_step(action)
-          n.do_learn(reward)
+          action = n.step(new_input,reward,trialEnd,device)
+          new_input, reward, trialEnd = t.step(action)
+          n.learn(reward)
           if trialEnd:
                 trial_running = False
                 t.curve_length = np.random.randint(max_length-min_length+1) + min_length

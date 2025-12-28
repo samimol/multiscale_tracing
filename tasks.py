@@ -42,15 +42,15 @@ class Task():
         
         self.n_hidden_features = n_hidden_features
 
-        self.flowcontrol = {'intertrial': self.do_intertrial,
-                            'go': self.do_go}
+        self.flowcontrol = {'intertrial': self.handle_intertrial,
+                            'go': self.handle_go}
 
     def state_reset(self):
         self.trial_ended = True
         self.state = 'intertrial'
         self.input = self.display
 
-    def do_step(self, action):
+    def step(self, action):
         self.trial_ended = False
         self.flowcontrol[self.state](action)
         reward = self.current_reward
@@ -59,14 +59,14 @@ class Task():
         self.current_reward = 0
         return(input, reward, trial_ended)
 
-    def do_intertrial(self, action):
+    def handle_intertrial(self, action):
         object_1,object_2 = self.pick_object()
         self.draw_stimulus(object_1,object_2)
         self.input = self.display
         self.state = 'go'
 
 
-    def do_go(self, action):
+    def handle_go(self, action):
         pixel_chosen = torch.where(action == 1)[-1]
         if pixel_chosen == self.target_curve[-1]:
             self.current_reward = self.current_reward + self.final_reward * 0.8
