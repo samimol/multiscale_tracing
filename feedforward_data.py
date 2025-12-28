@@ -15,7 +15,19 @@ from helper_functions import make_curves, make_blob
 
 
 
-def make_dataset_curve(grid_size,big_pixel_size,other_big_pixel_size,num_trial,device):
+def make_dataset_curve(grid_size, big_pixel_size, other_big_pixel_size, num_trial, device):
+    """Generate synthetic dataset of curves for feedforward network training.
+    
+    Args:
+        grid_size (int): Size of the spatial grid.
+        big_pixel_size (int): Size of target scale pixels.
+        other_big_pixel_size (list): Sizes of other scales.
+        num_trial (int): Number of training examples to generate.
+        device (torch.device): Device to place tensors on.
+        
+    Returns:
+        tuple: (input_list, labels, labels_other) - inputs and multi-scale labels.
+    """
     grid_size = grid_size
     big_pixel_size = big_pixel_size
     big_grid_size = grid_size // big_pixel_size
@@ -98,7 +110,19 @@ def make_dataset_curve(grid_size,big_pixel_size,other_big_pixel_size,num_trial,d
     return(input_list,labels,labels_other)
 
 
-def make_dataset_blob(grid_size,big_pixel_size,other_big_pixel_size,num_trial,device):
+def make_dataset_blob(grid_size, big_pixel_size, other_big_pixel_size, num_trial, device):
+    """Generate synthetic dataset of blobs/objects for feedforward network training.
+    
+    Args:
+        grid_size (int): Size of the spatial grid.
+        big_pixel_size (int): Size of target scale pixels.
+        other_big_pixel_size (list): Sizes of other scales.
+        num_trial (int): Number of training examples to generate.
+        device (torch.device): Device to place tensors on.
+        
+    Returns:
+        tuple: (input_list, labels, labels_other) - inputs and multi-scale labels.
+    """
     grid_size = grid_size
     big_pixel_size = big_pixel_size
     big_grid_size = grid_size // big_pixel_size
@@ -151,7 +175,16 @@ def make_dataset_blob(grid_size,big_pixel_size,other_big_pixel_size,num_trial,de
     return(input_list,labels,labels_other)
 
 
-def make_data_feedforward(device,num_scales):
+def make_data_feedforward(device, num_scales):
+    """Generate complete feedforward training dataset for all scales.
+    
+    Args:
+        device (torch.device): Device to place tensors on.
+        num_scales (int): Number of spatial scales.
+        
+    Returns:
+        tuple: Complete dataset with curve and blob data at all scales.
+    """
     RF_size = [3**i for i in range(1,num_scales)]
     input_curve = []
     labels_curve = [[] for i in range(num_scales-1)]

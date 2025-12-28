@@ -10,8 +10,20 @@ import torch.nn.functional as F
 import random
 import torch.optim as optim
 
-class FeedforwardNetwork(nn.Module): 
-    def __init__(self,device,num_scales):
+class FeedforwardNetwork(nn.Module):
+    """Multi-scale feedforward convolutional network for feature detection.
+    
+    This network processes visual input at multiple spatial scales to detect
+    objects and curves at different resolutions.
+    """
+    
+    def __init__(self, device, num_scales):
+        """Initialize feedforward network.
+        
+        Args:
+            device (torch.device): Device to place network on.
+            num_scales (int): Number of spatial scales to process.
+        """
         super().__init__()
 
         self.num_scales = num_scales
@@ -39,6 +51,14 @@ class FeedforwardNetwork(nn.Module):
         self.loss = []
                
     def forward(self, x):
+        """Forward pass through multi-scale network.
+        
+        Args:
+            x (torch.Tensor): Input image tensor of shape (batch, channels, height, width).
+            
+        Returns:
+            list: Multi-scale feature representations, one per scale (excluding first scale).
+        """
         
         intern_representation = [None] * (self.num_scales - 1)
         x = F.relu(self.feedforward[0](x))
@@ -49,7 +69,19 @@ class FeedforwardNetwork(nn.Module):
         return intern_representation
     
     
-    def train_network(self,optimizer,criterion,input_list,labels,epochs=2,verbose=False,print_frequency=2000,batch_size=1):
+    def train_network(self, optimizer, criterion, input_list, labels, epochs=2, verbose=False, print_frequency=2000, batch_size=1):
+        """Train the feedforward network.
+        
+        Args:
+            optimizer (torch.optim.Optimizer): Optimizer for training.
+            criterion (list): List of loss functions for each scale.
+            input_list (torch.Tensor): Training input images.
+            labels (list): List of label tensors for each scale.
+            epochs (int): Number of training epochs.
+            verbose (bool): Whether to print training progress.
+            print_frequency (int): Frequency of progress printing.
+            batch_size (int): Batch size for training.
+        """
         for epoch in range(epochs):  # loop over the dataset multiple times
             running_loss = 0.0
             count = 0
@@ -82,7 +114,18 @@ class FeedforwardNetwork(nn.Module):
                         running_loss = 0.0
 
 
-def train_feedforward_blob(num_scales,input_blob,labels_blob,device):
+def train_feedforward_blob(num_scales, input_blob, labels_blob, device):
+    """Train feedforward network for blob/object detection.
+    
+    Args:
+        num_scales (int): Number of spatial scales.
+        input_blob (torch.Tensor): Input images containing blobs.
+        labels_blob (list): Labels for blob detection at each scale.
+        device (torch.device): Device to train on.
+        
+    Returns:
+        FeedforwardNetwork: Trained network for blob detection.
+    """
     feedforward_blob = FeedforwardNetwork(device,num_scales)
     feedforward_blob = feedforward_blob.to(device)
     criterion = [nn.BCELoss() for i in range(num_scales-1)]
@@ -90,7 +133,18 @@ def train_feedforward_blob(num_scales,input_blob,labels_blob,device):
     feedforward_blob.train_network(optimizer,criterion,input_blob.to(device),[labels_blob[i].to(device) for i in range(labels_blob)],epochs=80,verbose=False,batch_size=256)
     return(feedforward_blob)
 
-def train_feedforward_curve(num_scales,input_curve,labels_curve,device):
+def train_feedforward_curve(num_scales, input_curve, labels_curve, device):
+    """Train feedforward network for curve detection.
+    
+    Args:
+        num_scales (int): Number of spatial scales.
+        input_curve (list): List of input images containing curves.
+        labels_curve (list): Labels for curve detection at each scale.
+        device (torch.device): Device to train on.
+        
+    Returns:
+        FeedforwardNetwork: Trained network for curve detection.
+    """
     feedforward_curve = FeedforwardNetwork(device,num_scales)
     feedforward_curve = feedforward_curve.to(device)
     criterion = [nn.BCELoss() for i in range(num_scales-1)]
