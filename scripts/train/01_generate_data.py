@@ -67,7 +67,7 @@ def main():
     print(f"  - Curve samples: {DataConfig.num_samples}")
     print(f"  - Blob samples: {DataConfig.num_samples}")
     
-    data = make_data_feedforward(device, DataConfig.num_scales)
+    data = make_data_feedforward(device, DataConfig.num_scales,DataConfig.num_samples)
     
     print("Data generation complete\n")
     

@@ -279,7 +279,7 @@ def make_dataset_blob(grid_size, big_pixel_size, other_big_pixel_size, num_trial
     return(input_list,labels,labels_other)
 
 
-def make_data_feedforward(device, num_scales):
+def make_data_feedforward(device, num_scales,num_trials):
     """Generate complete feedforward training dataset for all scales.
     
     This is the main entry point for generating the entire feedforward dataset.
@@ -316,7 +316,7 @@ def make_data_feedforward(device, num_scales):
             RF_size[-1]*4,                    # Grid size
             RF_size[i],                       # Target scale
             np.setdiff1d(RF_size,RF_size[i]), # Other scales
-            50000,                            # Number of samples
+            num_trials,                            # Number of samples
             device
         )
         
