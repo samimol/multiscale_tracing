@@ -5,9 +5,13 @@ Created on Tue Jan  3 15:28:45 2023
 @author: Sami
 """
 
+from typing import List, Tuple, Optional
 from layers import InputLayer, HiddenLayer, OutputLayer, FeedforwardLayer
 import torch
 import numpy as np
+
+from src.models.layers import CustomLayer
+
 
 class RecurrentNetwork():
     """Hierarchical recurrent network for visual attention and curve tracing.
@@ -17,7 +21,7 @@ class RecurrentNetwork():
     decision-making in visual tasks.
     """
 
-    def __init__(self, n_input_features, grid_size, device, feedforward_curve, feedforward_object, one_scale, num_scales):
+    def __init__(self, n_input_features: int, grid_size: int, device: torch.device, feedforward_curve: FeedforwardLayer, feedforward_object: FeedforwardLayer, one_scale: bool, num_scales: int) -> None:
         """Initialize recurrent network.
         
         Args:
@@ -50,7 +54,7 @@ class RecurrentNetwork():
         if num_scales == 1:
             raise Exception("Minimum two scales")
 
-        self.layers_list = [InputLayer(self.n_input_features, self.n_hidden_features)]
+        self.layers_list: List[HiddenLayer] = [InputLayer(self.n_input_features, self.n_hidden_features)]
         self.RF_size_list = [1] + [3**i for i in range(self.num_scales)]
         
         RF_size = 3
@@ -58,11 +62,11 @@ class RecurrentNetwork():
             if i == 0:
                 self.layers_list.append(HiddenLayer(self.n_input_features, self.n_hidden_features, self.high_feature,RF_size,grid_size,change_scale_fb=True))
             elif i == 1 and num_scales > 2:
-                self.layers_list.append(HiddenLayer(self.n_hidden_features, self.high_feature,self.high_feature,RF_size,grid_size,change_scale_ff=True,higher_scale=True,change_scale_fb=True,upper_ymod=True))
+                self.layers_list.append(HiddenLayer(self.n_hidden_features, self.high_feature,self.high_feature,RF_size,grid_size,change_scale_ff=True,higher_scale=True,change_scale_fb=True,has_feedback=True))
             elif i < num_scales - 1:
-                self.layers_list.append(HiddenLayer(self.high_feature, self.high_feature,self.high_feature,RF_size,grid_size,change_scale_ff=True,higher_scale=True,change_scale_fb=True,upper_ymod=True))
+                self.layers_list.append(HiddenLayer(self.high_feature, self.high_feature,self.high_feature,RF_size,grid_size,change_scale_ff=True,higher_scale=True,change_scale_fb=True,has_feedback=True))
             elif i == num_scales - 1:
-                self.layers_list.append(HiddenLayer(self.high_feature,self.high_feature,self.high_feature,RF_size,grid_size,upper_ymod = False,change_scale_ff=True))
+                self.layers_list.append(HiddenLayer(self.high_feature,self.high_feature,self.high_feature,RF_size,grid_size,has_feedback = False,change_scale_ff=True))
         self.layers_list.append(OutputLayer(self.high_feature,self.n_hidden_features, self.n_input_features, 1,self.grid_size,self.RF_size_list))
         self.feedforward_network_curve = FeedforwardLayer(feedforward_curve.feedforward,feedforward_curve.feedforward_interm,num_scales)
         self.feedforward_network_object = FeedforwardLayer(feedforward_object.feedforward,feedforward_object.feedforward_interm,num_scales)
@@ -76,7 +80,7 @@ class RecurrentNetwork():
         self.to_device()
 
         
-    def step(self, input_env, reward, reset_traces, device):
+    def step(self, input_env: torch.Tensor, reward: float, reset_traces: bool, device: torch.device) -> torch.Tensor:
         """Perform one step of network dynamics and action selection.
         
         This method runs the recurrent dynamics until convergence, then selects
@@ -139,14 +143,14 @@ class RecurrentNetwork():
 
             # Update all layers in hierarchy
             # Input layer: receives feedback from layer 1 and sensory input
-            (self.pyramidal_recurrent[0],self.VIP[0],self.SOM[0]) = self.layers_list[0].forward(self.pyramidal_recurrent[1],input_env)
+            self.pyramidal_recurrent[0],self.VIP[0],self.SOM[0] = self.layers_list[0].forward(self.pyramidal_recurrent[1],input_env)
             
             # Hidden layers: integrate feedforward, feedback, and horizontal connections
             for layer in range(1,len(self.pyramidal_recurrent)-1):
-                (self.pyramidal_recurrent[layer],self.VIP[layer],self.SOM[layer]) = self.layers_list[layer].forward(self.pyramidal_feedforward[layer],lower_ymod = self.pyramidal_recurrent[layer-1],upper_ymod = self.pyramidal_recurrent[layer + 1],horiz=self.pyramidal_recurrent[layer])
+                (self.pyramidal_recurrent[layer],self.VIP[layer],self.SOM[layer]) = self.layers_list[layer].forward(current_y=self.pyramidal_feedforward[layer],lower_ymod = self.pyramidal_recurrent[layer-1],upper_y = self.pyramidal_recurrent[layer + 1],horiz=self.pyramidal_recurrent[layer])
             
             # Top layer: no feedback from above
-            (self.pyramidal_recurrent[-1],self.VIP[-1],self.SOM[-1]) = self.layers_list[layer+1].forward(self.pyramidal_feedforward[layer+1],lower_ymod = self.pyramidal_recurrent[-2],upper_ymod = None,horiz=self.pyramidal_recurrent[-1])
+            (self.pyramidal_recurrent[-1],self.VIP[-1],self.SOM[-1]) = self.layers_list[layer+1].forward(self.pyramidal_feedforward[layer+1],lower_ymod = self.pyramidal_recurrent[-2],upper_y = None,horiz=self.pyramidal_recurrent[-1])
 
             # Save activities for analysis if requested
             if self.save_activities:
@@ -176,14 +180,14 @@ class RecurrentNetwork():
         
         (self.prev_prev_pyramidal[0],self.prev_prev_VIP[0],self.prev_prev_SOM[0]) = self.layers_list[0].forward(self.pyramidal_recurrent[1],input_env)
         for layer in range(1,len(self.pyramidal_recurrent)-1):
-            (self.prev_prev_pyramidal[layer],self.prev_prev_VIP[layer],self.prev_prev_SOM[layer]) = self.layers_list[layer].forward(self.pyramidal_feedforward[layer],lower_ymod = self.pyramidal_recurrent[layer-1],upper_ymod = self.pyramidal_recurrent[layer + 1],horiz=self.pyramidal_recurrent[layer])
-        (self.prev_prev_pyramidal[-1],self.prev_prev_VIP[-1],self.prev_prev_SOM[-1]) = self.layers_list[layer+1].forward(self.pyramidal_feedforward[layer+1],lower_ymod = self.pyramidal_recurrent[-2],upper_ymod = None,horiz=self.pyramidal_recurrent[-1])
+            (self.prev_prev_pyramidal[layer],self.prev_prev_VIP[layer],self.prev_prev_SOM[layer]) = self.layers_list[layer].forward(self.pyramidal_feedforward[layer],lower_ymod = self.pyramidal_recurrent[layer-1],upper_y = self.pyramidal_recurrent[layer + 1],horiz=self.pyramidal_recurrent[layer])
+        (self.prev_prev_pyramidal[-1],self.prev_prev_VIP[-1],self.prev_prev_SOM[-1]) = self.layers_list[layer+1].forward(self.pyramidal_feedforward[layer+1],lower_ymod = self.pyramidal_recurrent[-2],upper_y = None,horiz=self.pyramidal_recurrent[-1])
                       
 
         (self.prev_pyramidal[0],self.prev_VIP[0],self.prev_SOM[0]) = self.layers_list[0].forward(self.prev_prev_pyramidal[1],input_env)
         for layer in range(1,len(self.pyramidal_recurrent)-1):
-            (self.prev_pyramidal[layer],self.prev_VIP[layer],self.prev_SOM[layer]) = self.layers_list[layer].forward(self.pyramidal_feedforward[layer],lower_ymod = self.prev_pyramidal[layer-1],upper_ymod = self.prev_prev_pyramidal[layer + 1],horiz=self.prev_prev_pyramidal[layer])
-        (self.prev_pyramidal[-1],self.prev_VIP[-1],self.prev_SOM[-1]) = self.layers_list[layer+1].forward(self.pyramidal_feedforward[layer+1],lower_ymod = self.prev_pyramidal[-2],upper_ymod = None,horiz=self.prev_prev_pyramidal[-1])
+            (self.prev_pyramidal[layer],self.prev_VIP[layer],self.prev_SOM[layer]) = self.layers_list[layer].forward(current_y=self.pyramidal_feedforward[layer],lower_ymod = self.prev_pyramidal[layer-1],upper_y = self.prev_prev_pyramidal[layer + 1],horiz=self.prev_prev_pyramidal[layer])
+        (self.prev_pyramidal[-1],self.prev_VIP[-1],self.prev_SOM[-1]) = self.layers_list[layer+1].forward(self.pyramidal_feedforward[layer+1],lower_ymod = self.prev_pyramidal[-2],upper_y = None,horiz=self.prev_prev_pyramidal[-1])
               
         self.pyramidal_recurrent_detached = self.detach_and_reattach(self.prev_pyramidal)
         self.VIP_detached = self.detach_and_reattach(self.prev_VIP)
@@ -192,8 +196,8 @@ class RecurrentNetwork():
 
         (self.pyramidal_recurrent[0],self.VIP[0],self.SOM[0]) = self.layers_list[0].forward(self.pyramidal_recurrent_detached[1],input_env)
         for layer in range(1,len(self.pyramidal_recurrent)-1):
-            (self.pyramidal_recurrent[layer],self.VIP[layer],self.SOM[layer]) = self.layers_list[layer].forward(self.pyramidal_feedforward[layer],lower_ymod = self.pyramidal_recurrent[layer-1],upper_ymod = self.pyramidal_recurrent_detached[layer + 1],horiz=self.pyramidal_recurrent_detached[layer])
-        (self.pyramidal_recurrent[-1],self.VIP[-1],self.SOM[-1]) = self.layers_list[layer+1].forward(self.pyramidal_feedforward[layer+1],lower_ymod = self.pyramidal_recurrent[-2],upper_ymod = None,horiz=self.pyramidal_recurrent_detached[-1])
+            (self.pyramidal_recurrent[layer],self.VIP[layer],self.SOM[layer]) = self.layers_list[layer].forward(self.pyramidal_feedforward[layer],lower_ymod = self.pyramidal_recurrent[layer-1],upper_y = self.pyramidal_recurrent_detached[layer + 1],horiz=self.pyramidal_recurrent_detached[layer])
+        (self.pyramidal_recurrent[-1],self.VIP[-1],self.SOM[-1]) = self.layers_list[layer+1].forward(self.pyramidal_feedforward[layer+1],lower_ymod = self.pyramidal_recurrent[-2],upper_y = None,horiz=self.pyramidal_recurrent_detached[-1])
                                                                                     
         
         self.output_values = self.calculate_output(device)
@@ -207,7 +211,7 @@ class RecurrentNetwork():
 
         return (action_chosen)
 
-    def calculate_output(self, device):
+    def calculate_output(self, device: torch.device) -> torch.Tensor:
         """Calculate output Q-values and select action.
         
         Args:
@@ -232,7 +236,7 @@ class RecurrentNetwork():
 
         return output
 
-    def calculate_max_q_value(self, q_values):
+    def calculate_max_q_value(self, q_values: torch.Tensor) -> int:
         """Select action with maximum Q-value (exploitation).
         
         Args:
@@ -247,7 +251,7 @@ class RecurrentNetwork():
             winner = tiebreak
         return winner
 
-    def calculate_soft_winner_take_all(self, probabilities, device):
+    def calculate_soft_winner_take_all(self, probabilities: torch.Tensor, device: torch.device) -> int:
         """Select action using softmax sampling (exploration).
         
         Args:
@@ -263,7 +267,7 @@ class RecurrentNetwork():
             if random_value <= prob:
                 return i
 
-    def compute_gradients(self):
+    def compute_gradients(self) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]]:
         """Compute gradients through recurrent dynamics using backpropagation.
         
         This implements truncated backpropagation through time with multiple
@@ -317,7 +321,7 @@ class RecurrentNetwork():
 
         return (gradient_pyramidal, gradient_vip, gradient_som)
 
-    def learn(self, reward):
+    def learn(self, reward: float) -> None:
         """Update network weights using reward prediction error.
         
         This implements a biologically-inspired learning rule based on the
@@ -337,7 +341,7 @@ class RecurrentNetwork():
             self.layers_list[layer].update_layer([self.pyramidal_recurrent[layer],self.SOM[layer],self.VIP[layer]],[gradient_pyramidal[layer],gradient_som[layer],gradient_vip[layer]],self.beta,self.delta,train_v=False)
         self.layers_list[-1].update_layer(self.output_values[self.action], self.beta, self.delta)
 
-    def detach_and_reattach(self, x):
+    def detach_and_reattach(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
         """Detach tensors from computation graph and reattach for new gradients.
         
         Args:
@@ -351,7 +355,7 @@ class RecurrentNetwork():
             xx.requires_grad = True
         return(detached)
 
-    def to_device(self):
+    def to_device(self) -> None:
         """Move all network layers to the specified device."""
         for layer in range(len(self.layers_list)):
             self.layers_list[layer].to(self.device)

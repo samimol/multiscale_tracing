@@ -11,13 +11,13 @@ import numpy as np
 import random
 import os
 import datetime
-from feedforward_data import *
-from feedforward_network import *
-from recurrent_network import *
-from tasks import *
-from helper_functions import *
-from config import parser
-import torch.optim as optim
+
+from config.model_config import parser
+from runner_functions import train_feedforward_blob, train_feedforward_curve
+from src.data.feedforward_data import make_data_feedforward
+from src.models.recurrent_network import RecurrentNetwork
+from src.tasks.tasks import TraceCurves
+from src.utils.helper_functions import test_network
 
 if os.name == 'nt':
    batch_id = 0

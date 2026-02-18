@@ -233,10 +233,10 @@ def make_dataset_blob(grid_size, big_pixel_size, other_big_pixel_size, num_trial
               x_target = x_blob[ind[1]]  # Target point x-coordinate
               y_target = y_blob[ind[1]]  # Target point y-coordinate
               
-              # Place blob in red channel (feature 1)
-              input[1,x_blob,y_blob] = 1
+              # Place blob in green channel (feature 1)
+              input[1,x_blob.tolist(),y_blob.tolist()] = 1
               
-              # Remove start point from blob and mark it in green channel (feature 2)
+              # Remove start point from blob and mark it in blue channel (feature 2)
               input[1,x0,y0] = 0
               input[2,x0,y0] = 1
               
@@ -306,7 +306,7 @@ def make_data_feedforward(device, num_scales,num_trials):
     labels_curve = [[] for i in range(num_scales-1)]  # Labels organized by scale
     
     # Generate curve datasets for each scale
-    for i in range(num_scales):
+    for i in range(1,len(RF_size)):
         # Generate curves at scale i
         # Grid size: RF_size[-1]*4 (e.g., 27*4=108 for 4 scales)
         # Target scale: RF_size[i]
@@ -339,7 +339,7 @@ def make_data_feedforward(device, num_scales,num_trials):
         RF_size[-1]*8,                    # Grid size (larger for blobs)
         RF_size[-1],                      # Target scale (highest)
         np.setdiff1d(RF_size,RF_size[-1]), # Other scales
-        20000,                            # Number of samples
+        num_trials,                            # Number of samples
         device
     )
     

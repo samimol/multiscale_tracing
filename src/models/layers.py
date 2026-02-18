@@ -4,6 +4,7 @@ Created on Fri Oct 29 12:29:28 2021
 
 @author: Sami
 """
+from typing import Optional, List, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
@@ -16,12 +17,12 @@ class CustomLayer(nn.Module):
     weight initialization, activation functions, and biologically-inspired learning rules.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the custom layer with default parameters."""
         self.initialisation_range = 0.1
         super().__init__()
 
-    def activation_function(self, x):
+    def activation_function(self, x: torch.Tensor) -> torch.Tensor:
         """Apply ReLU activation function.
         
         Args:
@@ -32,7 +33,7 @@ class CustomLayer(nn.Module):
         """
         return torch.relu(x)
 
-    def step_function(self, x):
+    def step_function(self, x: torch.Tensor) -> torch.Tensor:
         """Apply a piecewise linear step function with saturation.
         
         Args:
@@ -49,7 +50,7 @@ class CustomLayer(nn.Module):
         return x
 
 
-    def gating_function(self, x):
+    def gating_function(self, x: torch.Tensor) -> torch.Tensor:
         """Apply a smooth gating function for modulation.
         
         Args:
@@ -61,7 +62,7 @@ class CustomLayer(nn.Module):
         param = 100
         return torch.relu(param*x/(torch.sqrt(1+(param**2)*(x**2))))
 
-    def initialize_feedforward_weights(self, layer, one_to_one=False, change_scale=False, receptive_field_size=1):
+    def initialize_feedforward_weights(self, layer: nn.Module, one_to_one: bool = False, change_scale: bool = False, receptive_field_size: int = 1) -> None:
         """Initialize feedforward connection weights with specific patterns.
         
         Args:
@@ -107,7 +108,7 @@ class CustomLayer(nn.Module):
         if layer.bias is not None:
             layer.bias = torch.nn.Parameter(bias)
 
-    def initialize_feedback_weights(self, layer, change_scale=False):
+    def initialize_feedback_weights(self, layer: nn.Module, change_scale: bool = False) -> None:
         """Initialize feedback connection weights.
         
         Args:
@@ -140,7 +141,7 @@ class CustomLayer(nn.Module):
             layer.bias = torch.nn.Parameter(bias)
 
 
-    def initialize_inhibitory_weights(self, layer):
+    def initialize_inhibitory_weights(self, layer: nn.Module) -> None:
         """Initialize inhibitory connection weights with negative biases.
         
         Args:
@@ -169,7 +170,7 @@ class CustomLayer(nn.Module):
             layer.bias = torch.nn.Parameter(bias)
 
 
-    def average_traces(self, traces, mask, receptive_field_size=1):
+    def average_traces(self, traces: torch.Tensor, mask: torch.Tensor, receptive_field_size: int = 1) -> torch.Tensor:
         """Average gradient traces over spatial dimensions for weight updates.
         
         Args:
@@ -197,7 +198,7 @@ class CustomLayer(nn.Module):
         return(traces)
 
 
-    def update_weight(self, layer, upper, beta, delta, mask=None, z=None, average=True, receptive_field_size=1, inhib=False, change_scale=False):
+    def update_weight(self, layer: nn.Module, upper: torch.Tensor, beta: float, delta: float, mask: Optional[torch.Tensor] = None, z: Optional[torch.Tensor] = None, average: bool = True, receptive_field_size: int = 1, inhib: bool = False, change_scale: bool = False) -> nn.Module:
         """Update layer weights using reward prediction error.
         
         Args:
@@ -249,7 +250,7 @@ class CustomLayer(nn.Module):
                 layer.bias.copy_(bias_update)
         return(layer)
     
-    def make_mask(self, weight):
+    def make_mask(self, weight: torch.Tensor) -> torch.Tensor:
         """Create a binary mask from weight tensor.
         
         Args:
@@ -262,24 +263,24 @@ class CustomLayer(nn.Module):
         mask[mask != 0] = 1
         return mask
         
-    def to(self, device):
+    def to(self, device: torch.device) -> None:
         """Move layer parameters to specified device.
 
         Args:
             device (torch.device): Target device (CPU or CUDA).
         """
         if self.layer_type == 'input':
-          self.upper_modulation.to(device)
+          self.FB.to(device)
           self.lateral_inhibition.to(device)
           self.feedback_mask = self.feedback_mask.to(device)
           self.inhibition_mask = self.inhibition_mask.to(device)
         elif self.layer_type == 'hidden':
-          self.feedforward_connection.to(device)
+          self.FF.to(device)
           self.feedforward_mask = self.feedforward_mask.to(device)
           self.horizontal_mask = self.horizontal_mask.to(device)
-          self.horizontal_connection.to(device)
-          if self.upper_ymod:
-              self.upper_modulation.to(device)
+          self.H.to(device)
+          if self.has_feedback:
+              self.FB.to(device)
               self.feedback_mask = self.feedback_mask.to(device)
         elif self.layer_type == 'output':
           for layer in range(len(self.skip_weights)):
@@ -296,7 +297,7 @@ class InputLayer(CustomLayer):
     through VIP and SOM interneuron populations.
     """
 
-    def __init__(self, feature_in, feature_out):
+    def __init__(self, feature_in: int, feature_out: int) -> None:
         """Initialize input layer.
         
         Args:
@@ -307,35 +308,35 @@ class InputLayer(CustomLayer):
         self.layer_type = 'input'
         K_size = 3
 
-        self.upper_modulation = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same',bias=False)
+        self.FB = nn.Conv2d(feature_out, feature_in, K_size, stride=1, padding='same',bias=False)
         self.lateral_inhibition = nn.Conv2d(feature_in, feature_in, K_size, stride=1, padding='same',bias=True)
 
         # Initializing weights
-        self.initialize_feedback_weights(self.upper_modulation)
+        self.initialize_feedback_weights(self.FB)
         self.initialize_inhibitory_weights(self.lateral_inhibition)
 
         # Setting the mask to have connections only between neighboours
-        self.feedback_mask = self.make_mask(self.upper_modulation.weight)
+        self.feedback_mask = self.make_mask(self.FB.weight)
         self.inhibition_mask = self.make_mask(self.lateral_inhibition.weight)
 
-    def forward(self, upper_ymod, input_stimulus):
+    def forward(self, upper_y: torch.Tensor, input_stimulus: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass through input layer.
         
         Args:
-            upper_ymod (torch.Tensor): Modulation signal from upper layer.
+            upper_y (torch.Tensor): Modulation signal from upper layer.
             input_stimulus (torch.Tensor): Sensory input stimulus.
             
         Returns:
             tuple: (modulated_output, vip_activity, som_activity)
         """
         Y = input_stimulus
-        vip_activity = self.step_function(self.upper_modulation(upper_ymod)) 
+        vip_activity = self.step_function(self.FB(upper_y))
         som_activity = self.activation_function(1 - vip_activity)
         modulated_output =  self.activation_function((-self.lateral_inhibition(som_activity)) * self.gating_function(Y))
         return(modulated_output, vip_activity, som_activity)
 
 
-    def update_layer(self, upper, z, beta, delta):
+    def update_layer(self, upper: List[torch.Tensor], z: List[torch.Tensor], beta: float, delta: float) -> None:
         """Update layer weights based on reward prediction error.
         
         Args:
@@ -344,7 +345,7 @@ class InputLayer(CustomLayer):
             beta (float): Learning rate.
             delta (float): Reward prediction error.
         """
-        self.upper_modulation = self.update_weight(self.upper_modulation, upper[2], beta, delta, self.feedback_mask, z[2],change_scale=False)
+        self.FB = self.update_weight(self.FB, upper[2], beta, delta, self.feedback_mask, z[2],change_scale=False)
         self.lateral_inhibition = self.update_weight(self.lateral_inhibition, upper[0], beta, delta, self.inhibition_mask, z[0],inhib=True)
 
 class HiddenLayer(CustomLayer):
@@ -354,7 +355,7 @@ class HiddenLayer(CustomLayer):
     (feedback), and within the same layer (horizontal connections).
     """
 
-    def __init__(self, feature_in_lower, feature_out, feature_in_higher, big_pixels_size, grid_size, upper_ymod=True, change_scale_fb=False, change_scale_ff=False, higher_scale=False):
+    def __init__(self, feature_in_lower: int, feature_out: int, feature_in_higher: int, big_pixels_size: int, grid_size: int, has_feedback: bool = True, change_scale_fb: bool = False, change_scale_ff: bool = False, higher_scale: bool = False) -> None:
         """Initialize hidden layer.
         
         Args:
@@ -363,14 +364,14 @@ class HiddenLayer(CustomLayer):
             feature_in_higher (int): Number of features from higher layer.
             big_pixels_size (int): Stride for scale-changing connections.
             grid_size (int): Size of spatial grid.
-            upper_ymod (bool): Whether to include upper layer modulation.
+            has_feedback (bool): Whether to include upper layer modulation.
             change_scale_fb (bool): Whether feedback changes scale.
             change_scale_ff (bool): Whether feedforward changes scale.
             higher_scale (bool): Whether this is a higher-scale layer.
         """
         super().__init__()
         self.layer_type = 'hidden'
-        self.upper_ymod = upper_ymod # If the higher layer has a modulated group
+        self.has_feedback = has_feedback # If the higher layer has a modulated group
         self.change_scale_fb = change_scale_fb
         self.change_scale_ff = change_scale_ff
         self.higher_scale = higher_scale
@@ -379,49 +380,49 @@ class HiddenLayer(CustomLayer):
         
         # Making the weights
         if self.change_scale_ff:
-          self.feedforward_connection = nn.Conv2d(feature_in_lower, feature_out, self.big_pixels_size, stride=self.big_pixels_size, bias=True)
+          self.FF = nn.Conv2d(feature_in_lower, feature_out, self.big_pixels_size, stride=self.big_pixels_size, bias=True)
         else:
-            self.feedforward_connection = nn.Conv2d(feature_in_lower, feature_out, 1, stride=1, padding='same', bias=True)     
+            self.FF = nn.Conv2d(feature_in_lower, feature_out, 1, stride=1, padding='same', bias=True)     
         
-        if upper_ymod:
-            self.upper_modulation = nn.ConvTranspose2d(feature_in_higher, feature_out, self.big_pixels_size, stride=self.big_pixels_size, padding=0,bias=False)
-        self.horizontal_connection = nn.Conv2d(feature_out,feature_out,3,stride = 1,padding='same',bias=False)
+        if has_feedback:
+            self.FB = nn.ConvTranspose2d(feature_in_higher, feature_out, self.big_pixels_size, stride=self.big_pixels_size, padding=0,bias=False)
+        self.H = nn.Conv2d(feature_out,feature_out,3,stride = 1,padding='same',bias=False)
         
         # Initializing the weights
-        self.initialize_feedforward_weights(self.feedforward_connection,change_scale = change_scale_ff,one_to_one=True)
-        if upper_ymod:
-            self.initialize_feedback_weights(self.upper_modulation,change_scale = change_scale_fb)
-        self.initialize_feedback_weights(self.horizontal_connection,change_scale=False)
+        self.initialize_feedforward_weights(self.FF,change_scale = change_scale_ff,one_to_one=True)
+        if has_feedback:
+            self.initialize_feedback_weights(self.FB,change_scale = change_scale_fb)
+        self.initialize_feedback_weights(self.H,change_scale=False)
 
         # Making the masks        
-        if upper_ymod:
-            self.feedback_mask = self.make_mask(self.upper_modulation.weight)
-        self.feedforward_mask = self.make_mask(self.feedforward_connection.weight)
-        self.horizontal_mask = self.make_mask(self.horizontal_connection.weight)
+        if has_feedback:
+            self.feedback_mask = self.make_mask(self.FB.weight)
+        self.feedforward_mask = self.make_mask(self.FF.weight)
+        self.horizontal_mask = self.make_mask(self.H.weight)
    
 
-    def forward(self, current_y, lower_ymod=None, upper_ymod=None, horiz=None):
+    def forward(self, current_y: torch.Tensor, lower_ymod: Optional[torch.Tensor] = None, upper_y: Optional[torch.Tensor] = None, horiz: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass through hidden layer.
         
         Args:
             current_y (torch.Tensor): Current layer activity.
             lower_ymod (torch.Tensor, optional): Input from lower layer.
-            upper_ymod (torch.Tensor, optional): Modulation from upper layer.
+            upper_y (torch.Tensor, optional): Modulation from upper layer.
             horiz (torch.Tensor, optional): Horizontal connections.
             
         Returns:
             tuple: (modulated_output, vip_activity, som_activity)
         """
-        feedforward_input = self.feedforward_connection(lower_ymod)
-        if upper_ymod is not None:
-            vip_activity = self.step_function(self.upper_modulation(upper_ymod) + self.horizontal_connection(horiz))
+        feedforward_input = self.FF(lower_ymod)
+        if upper_y is not None:
+            vip_activity = self.step_function(self.FB(upper_y) + self.H(horiz))
         else:
-            vip_activity = self.step_function(self.horizontal_connection(horiz))
+            vip_activity = self.step_function(self.H(horiz))
         som_activity = self.activation_function(1 - vip_activity)
         modulated_output =  self.activation_function((feedforward_input - som_activity) * self.gating_function(current_y))
         return(modulated_output, vip_activity, som_activity)
         
-    def update_layer(self, upper, z, beta, delta, train_v=True):
+    def update_layer(self, upper: List[torch.Tensor], z: List[torch.Tensor], beta: float, delta: float, train_v: bool = True) -> None:
         """Update layer weights based on reward prediction error.
         
         Args:
@@ -431,10 +432,10 @@ class HiddenLayer(CustomLayer):
             delta (float): Reward prediction error.
             train_v (bool): Whether to train VIP connections.
         """
-        self.feedforward_connection = self.update_weight(self.feedforward_connection, upper[0], beta, delta, self.feedforward_mask, z[0],change_scale=self.change_scale_ff)
-        if self.upper_ymod:
-            self.upper_modulation = self.update_weight(self.upper_modulation, upper[2], beta, delta, self.feedback_mask, z[2],change_scale = self.change_scale_fb)
-        self.horizontal_connection = self.update_weight(self.horizontal_connection, upper[2], beta, delta, self.horizontal_mask, z[2],change_scale = False)
+        self.FF = self.update_weight(self.FF, upper[0], beta, delta, self.feedforward_mask, z[0],change_scale=self.change_scale_ff)
+        if self.has_feedback:
+            self.FB = self.update_weight(self.FB, upper[2], beta, delta, self.feedback_mask, z[2],change_scale = self.change_scale_fb)
+        self.H = self.update_weight(self.H, upper[2], beta, delta, self.horizontal_mask, z[2],change_scale = False)
 
 class OutputLayer(CustomLayer):
     """Output layer that aggregates information from all hierarchical levels.
@@ -443,7 +444,7 @@ class OutputLayer(CustomLayer):
     to produce action values (Q-values).
     """
 
-    def __init__(self, high_features, hidden_features, input_features, feature_out, grid_size, RF_size_list):
+    def __init__(self, high_features: int, hidden_features: int, input_features: int, feature_out: int, grid_size: int, RF_size_list: List[int]) -> None:
         """Initialize output layer.
         
         Args:
@@ -487,7 +488,7 @@ class OutputLayer(CustomLayer):
 
         self.skip_weights = nn.ModuleList(self.skip_weights)
 
-    def forward(self, pyramidal_recurrent):
+    def forward(self, pyramidal_recurrent: List[torch.Tensor]) -> torch.Tensor:
         """Forward pass through output layer.
         
         Args:
@@ -501,7 +502,7 @@ class OutputLayer(CustomLayer):
             Y = Y + self.skip_weights[layer](pyramidal_recurrent[layer])
         return(Y)
 
-    def rescale(self, new_grid_size, device):
+    def rescale(self, new_grid_size: int, device: torch.device) -> None:
         """Rescale output layer for different grid size.
         
         Args:
@@ -537,7 +538,7 @@ class OutputLayer(CustomLayer):
         self.grid_size = new_grid_size
 
         
-    def update_layer(self, upper, beta, delta):
+    def update_layer(self, upper: torch.Tensor, beta: float, delta: float) -> None:
         """Update all skip connection weights.
         
         Args:
@@ -558,7 +559,7 @@ class FeedforwardLayer(CustomLayer):
     at multiple scales.
     """
 
-    def __init__(self, feedforward, feedforward_interm, num_scales):
+    def __init__(self, feedforward: nn.ModuleList, feedforward_interm: nn.ModuleList, num_scales: int) -> None:
         """Initialize feedforward layer.
         
         Args:
@@ -573,7 +574,7 @@ class FeedforwardLayer(CustomLayer):
         
         self.sig = nn.Sigmoid()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         """Forward pass through feedforward network.
         
         Args:

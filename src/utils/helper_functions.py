@@ -281,6 +281,7 @@ def test_network(t,CurveLength,grid_size,TrialNumber,n,device,save_activities,on
       
       # Run trial until completion
       while trial_running:
+        new_input.to(device)
         # Network selects action based on current input
         action = n.step(new_input,reward,trialEnd,device)
         # Task provides new input and reward
