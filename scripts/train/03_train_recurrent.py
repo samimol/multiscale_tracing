@@ -5,24 +5,31 @@ Created on Tue Apr 11 10:04:10 2023
 @author: Sami
 """
 
+import sys
+from pathlib import Path
+
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
 import torch
-import torch.nn as nn
+from tqdm import tqdm
 import numpy as np
 import random
 import os
 import datetime
 
 from config.model_config import parser
-from runner_functions import train_feedforward_blob, train_feedforward_curve
 from src.data.feedforward_data import make_data_feedforward
+from src.models.feedforward_network import train_feedforward_blob, train_feedforward_curve
 from src.models.recurrent_network import RecurrentNetwork
 from src.tasks.tasks import TraceCurves
 from src.utils.helper_functions import test_network
 
-if os.name == 'nt':
-   batch_id = 0
+if "SLURM_JOB_ID" in os.environ:
+    batch_id = str(os.environ.get("SLURM_PROCID", 0))
 else:
-    batch_id = os.environ["SLURM_PROCID"]
+    batch_id = "0"
     
 args = parser.parse_args()
 
@@ -56,9 +63,7 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device,num
     t.only_blue = False
     t.grid_size = grid_size
     t.curve_length = 3
-    
-    reward = 0
-    trialEnd = False
+
     trials = 55000
     average = 0
     trial_corrects = []
@@ -69,7 +74,7 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device,num
     
     generalization = np.zeros((total_length-2,total_length+1))
     
-    for i in range(trials):
+    for i in tqdm(range(trials)):
         trial_running = True
         new_input, reward, trialEnd= t.step(action)
         if i > 2000:
@@ -112,7 +117,7 @@ def train_full_network(feedforward_curve,feedforward_object,one_scale,device,num
 
 if __name__ == '__main__':
     
-    results_folder = os.path.join('multiscale','results','recurrent_networks')
+    results_folder = os.path.join(project_root,'models','recurrent')
     if args.one_scale:
         results_folder = os.path.join(results_folder,'_one_scale')
         
@@ -131,16 +136,16 @@ if __name__ == '__main__':
         filename = os.path.join(results_folder, 'performance_' + batch_id + '.pt')
         np.save(filename,np.array(trial_corrects))
     else:    
-        feedfoward_folder = os.path.join('multiscale','results','feedforward_networks')
+        feedfoward_folder = os.path.join(project_root,'models','feedforward')
     
         if device.type == 'cuda':
-          feedforward_curve = torch.load(os.path.join(feedfoward_folder,'FF_curve_' + batch_id + '.pt'))
+          feedforward_curve = torch.load(os.path.join(feedfoward_folder,'curve','FF_curve_' + batch_id + '.pt'),weights_only=False)
         else:
-            feedforward_curve = torch.load(os.path.join(feedfoward_folder,'FF_curve_' + batch_id + '.pt'), map_location=torch.device('cpu'))
+            feedforward_curve = torch.load(os.path.join(feedfoward_folder,'curve','FF_curve_' + batch_id + '.pt'), map_location=torch.device('cpu'),weights_only=False)
         if device.type == 'cuda':
-          feedforward_object = torch.load(os.path.join(feedfoward_folder,'FF_blob_' + batch_id + '.pt'))
+          feedforward_object = torch.load(os.path.join(feedfoward_folder,'blob','FF_blob_' + batch_id + '.pt'),weights_only=False)
         else:
-          feedforward_object = torch.load(os.path.join(feedfoward_folder,'FF_blob_' + batch_id + '.pt'), map_location=torch.device('cpu'))
+          feedforward_object = torch.load(os.path.join(feedfoward_folder,'blob','FF_blob_' + batch_id + '.pt'), map_location=torch.device('cpu'),weights_only=False)
             
         n,trial_corrects,generalization = train_full_network(feedforward_curve,feedforward_object,args.one_scale,device,num_scales)
         

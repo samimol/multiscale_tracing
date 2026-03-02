@@ -20,10 +20,8 @@ Outputs:
 """
 
 import torch
-import torch.nn as nn
 import numpy as np
 import random
-import os
 import datetime
 import pickle
 import sys

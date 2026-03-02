@@ -6,7 +6,7 @@ Created on Tue Jan  3 15:28:45 2023
 """
 
 from typing import List, Tuple, Optional
-from layers import InputLayer, HiddenLayer, OutputLayer, FeedforwardLayer
+from src.models.layers import InputLayer, HiddenLayer, OutputLayer, FeedforwardLayer
 import torch
 import numpy as np
 

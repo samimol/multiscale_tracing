@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import random
 import torch.optim as optim
+from tqdm import tqdm
 
 class FeedforwardNetwork(nn.Module):
     """Multi-scale feedforward convolutional network for feature detection.
@@ -82,7 +83,7 @@ class FeedforwardNetwork(nn.Module):
             print_frequency (int): Frequency of progress printing.
             batch_size (int): Batch size for training.
         """
-        for epoch in range(epochs):  # loop over the dataset multiple times
+        for epoch in tqdm(range(epochs)):  # loop over the dataset multiple times
             running_loss = 0.0
             count = 0
             permutation = list(range(len(labels[0])))
@@ -130,7 +131,7 @@ def train_feedforward_blob(num_scales, input_blob, labels_blob, device):
     feedforward_blob = feedforward_blob.to(device)
     criterion = [nn.BCELoss() for i in range(num_scales-1)]
     optimizer = optim.Adam(feedforward_blob.parameters(), lr=0.001)
-    feedforward_blob.train_network(optimizer,criterion,input_blob.to(device),[labels_blob[i].to(device) for i in range(labels_blob)],epochs=80,verbose=False,batch_size=256)
+    feedforward_blob.train_network(optimizer,criterion,input_blob.to(device),[labels_blob[i].to(device) for i in range(len(labels_blob))],epochs=80,verbose=False,batch_size=256)
     return(feedforward_blob)
 
 def train_feedforward_curve(num_scales, input_curve, labels_curve, device):
@@ -147,7 +148,7 @@ def train_feedforward_curve(num_scales, input_curve, labels_curve, device):
     """
     feedforward_curve = FeedforwardNetwork(device,num_scales)
     feedforward_curve = feedforward_curve.to(device)
-    criterion = [nn.BCELoss() for i in range(num_scales-1)]
+    criterion = [nn.BCELoss() for _ in range(num_scales-1)]
     optimizer = optim.Adam(feedforward_curve.parameters(), lr=0.001)
 
     feedforward_curve.train_network(optimizer,criterion,torch.cat(input_curve,dim=0).to(device),[torch.cat(labels_curve[i],dim=0).to(device) for i in range(len(labels_curve))],epochs=80,verbose=False,batch_size=256)
