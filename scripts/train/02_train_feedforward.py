@@ -64,31 +64,23 @@ def load_dataset():
 
 
 def prepare_data(feedforward_dataset, num_scales):
-    """Prepare blob and curve data for training.
-    
+    """
+    Prepare blob and curve data for training.
+
     Args:
-        feedforward_dataset: Raw dataset.
+        feedforward_dataset: Output of make_data_feedforward
         num_scales (int): Number of spatial scales.
-        
+
     Returns:
         tuple: (input_blob, labels_blob, input_curve, labels_curve)
     """
-    # Extract blob data
-    input_blob = feedforward_dataset[1][0][0]
-    labels_blob = feedforward_dataset[1][0][1]
-    
-    # Extract curve data from multiple scales
-    input_curve = []
-    labels_curve = [[] for i in range(num_scales-1)]
-    
-    for index_1, index_2 in enumerate([0, 2, 3]):
-        inputt = feedforward_dataset[index_2][0][0]
-        labels_curve_interm = feedforward_dataset[index_2][0][1]
-        
-        for p in range(len(labels_curve_interm)):
-            labels_curve[p].append(labels_curve_interm[p])
-        input_curve.append(inputt)
-    
+
+    # Unpack dataset correctly
+    input_curve = feedforward_dataset[0]        # list of curve inputs (per scale)
+    labels_curve = feedforward_dataset[1]       # list of lists (labels organized by scale)
+    input_blob = feedforward_dataset[2]         # blob inputs
+    labels_blob = feedforward_dataset[3]        # blob labels (all scales)
+
     return input_blob, labels_blob, input_curve, labels_curve
 
 
