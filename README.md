@@ -150,10 +150,16 @@ python run_workflow.py --stage 3
 If you use this code in your research, please cite:
 
 ```bibtex
-@article{multiscale_tracing,
-  title={Multiscale Hierarchical Recurrent Networks for Visual Attention},
-  author={Your Name},
-  journal={Journal Name},
-  year={2024}
+@article {Mollard2024.06.17.599272,
+	author = {Mollard, Sami and Bohte, Sander M. and Roelfsema, Pieter R.},
+	title = {How the visual brain can learn to parse images using a multiscale, incremental grouping process},
+	elocation-id = {2024.06.17.599272},
+	year = {2025},
+	doi = {10.1101/2024.06.17.599272},
+	publisher = {Cold Spring Harbor Laboratory},
+    URL = {https://www.biorxiv.org/content/early/2025/04/23/2024.06.17.599272},
+	eprint = {https://www.biorxiv.org/content/early/2025/04/23/2024.06.17.599272.full.pdf},
+	journal = {bioRxiv}
 }
+
 ```
